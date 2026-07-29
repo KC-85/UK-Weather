@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@source "../../templates/**/*.html";
+@source "../../apps/**/*.html";
+
+@theme {
+  --color-weather-navy: #0b1628;
+  --color-weather-sky: #38bdf8;
+  --color-weather-cloud: #e8eef5;
+}
+
+@layer components {
+  .weather-card {
+    @apply rounded-2xl border border-white/10 bg-white/10 p-6 shadow-xl;
+  }
+}

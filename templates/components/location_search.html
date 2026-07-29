@@ -1,0 +1,21 @@
+<form
+  class="flex max-w-xl gap-3"
+  hx-get="{% url 'locations:search' %}"
+  hx-target="#weather-results"
+  hx-indicator="#search-indicator"
+>
+  <label class="sr-only" for="location-query">Town, city, or postcode</label>
+  <input
+    class="min-w-0 flex-1 rounded-xl bg-white px-4 py-3 text-slate-950"
+    id="location-query"
+    name="query"
+    placeholder="Town, city, or postcode"
+    required
+  >
+  <button class="rounded-xl bg-sky-400 px-5 py-3 font-semibold text-slate-950">
+    Search
+  </button>
+</form>
+<div id="search-indicator" class="htmx-indicator mt-3">
+  {% include "weather/partials/loading.html" %}
+</div>

@@ -60,6 +60,7 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+staticfiles/
 
 # Flask stuff:
 instance/
@@ -116,6 +117,13 @@ ipython_config.py
 # pdm.toml
 .pdm-python
 .pdm-build/
+
+# Environment variables
+.env
+
+# Node / Tailwind
+node_modules/
+static/css/output.css
 
 # pixi
 #   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.

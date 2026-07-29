@@ -1,0 +1,16 @@
+{
+  "name": "uk-weather",
+  "private": true,
+  "scripts": {
+    "build": "npm run css:build && npm run ts:build",
+    "css:build": "tailwindcss -i ./assets/css/input.css -o ./static/css/output.css --minify",
+    "css:watch": "tailwindcss -i ./assets/css/input.css -o ./static/css/output.css --watch",
+    "ts:build": "esbuild ./assets/ts/app.ts --bundle --minify --sourcemap --outfile=./static/js/app.js",
+    "ts:watch": "npm run ts:build -- --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "esbuild": "^0.25.0",
+    "tailwindcss": "^4.1.0"
+  }
+}

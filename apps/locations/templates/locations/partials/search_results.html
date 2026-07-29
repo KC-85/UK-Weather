@@ -1,0 +1,9 @@
+{% if form.errors %}
+  <p class="rounded-xl bg-red-950/50 p-4 text-red-200">
+    Enter a UK town, city, or postcode.
+  </p>
+{% elif query %}
+  <div class="weather-card">
+    <p>Weather results for <strong>{{ query }}</strong> will appear here.</p>
+  </div>
+{% endif %}

@@ -1,0 +1,17 @@
+{% load static %}
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}UK Weather{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/output.css' %}">
+    <script src="https://unpkg.com/htmx.org@2.0.6" defer></script>
+  </head>
+  <body class="min-h-screen bg-weather-navy text-slate-50">
+    {% include "components/header.html" %}
+    {% include "components/messages.html" %}
+    {% block content %}{% endblock %}
+    <script src="{% static 'js/app.js' %}" defer></script>
+  </body>
+</html>

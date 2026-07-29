@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block title %}{{ location|title }} weather · UK Weather{% endblock %}
+
+{% block content %}
+  <main class="mx-auto max-w-5xl px-6 py-16">
+    <h1 class="text-4xl font-bold">{{ location|title }}</h1>
+    {% include "weather/partials/current_conditions.html" %}
+  </main>
+{% endblock %}

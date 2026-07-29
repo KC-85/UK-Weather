@@ -1,0 +1,7 @@
+<ul class="space-y-2">
+  {% for location in saved_locations %}
+    <li>{{ location.name }}</li>
+  {% empty %}
+    <li class="text-slate-400">No saved locations yet.</li>
+  {% endfor %}
+</ul>
