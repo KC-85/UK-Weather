@@ -4,6 +4,7 @@ import math
 from django.contrib.gis.db.models.functions import AsGeoJSON, GeomOutputGeoFunc
 from django.contrib.gis.geos import Polygon
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render
 
 from .models import Region
 
@@ -14,6 +15,15 @@ MAX_SIMPLIFICATION_TOLERANCE = 0.1
 class SimplifyPreserveTopology(GeomOutputGeoFunc):
     function = "ST_SimplifyPreserveTopology"
     arity = 2
+
+
+def region_panel(request, code):
+    region = get_object_or_404(Region, code=code)
+    return render(
+        request,
+        "locations/partials/region_panel.html",
+        {"region": region},
+    )
 
 
 def regions_geojson(request):
