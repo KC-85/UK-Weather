@@ -5,7 +5,8 @@
     "build": "npm run css:build && npm run ts:build",
     "css:build": "tailwindcss -i ./assets/css/input.css -o ./static/css/output.css --minify",
     "css:watch": "tailwindcss -i ./assets/css/input.css -o ./static/css/output.css --watch",
-    "ts:build": "esbuild ./assets/ts/app.ts --bundle --minify --sourcemap --outfile=./static/js/app.js",
+    "ts:worker": "cp ./node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs ./node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs ./static/js/",
+    "ts:build": "npm run ts:worker && esbuild ./assets/ts/app.ts --bundle --minify --sourcemap --outfile=./static/js/app.js",
     "ts:watch": "npm run ts:build -- --watch"
   },
   "devDependencies": {
