@@ -6,10 +6,13 @@
       id="weather-map"
       class="h-full w-full"
       data-regions-url="{% url 'locations:regions_geojson' %}"
+      data-region-panel-url-template="{% url 'locations:region_panel' 'REGION_CODE' %}"
     ></div>
 
-    <aside id="weather-panel">
-      <!-- HTMX forecast content will appear here -->
-    </aside>
+    <aside
+      id="weather-panel"
+      class="absolute inset-x-4 bottom-4 z-10 md:inset-x-auto md:right-6 md:top-6 md:bottom-auto md:w-96"
+      aria-live="polite"
+    ></aside>
   </main>
 {% endblock %}
