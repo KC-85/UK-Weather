@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.gis.db import models
 
 
@@ -21,3 +22,11 @@ class Region(models.Model):
 
     boundary = models.MultiPolygonField(srid=4326)
     forecast_point = models.PointField(srid=4326)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
