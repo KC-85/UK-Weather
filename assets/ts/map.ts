@@ -54,8 +54,15 @@ export const initialiseWeatherMap = (): void => {
 
   map.addControl(new NavigationControl(), "top-right");
 
+  const regionTooltip = document.createElement("div");
+  regionTooltip.className = "region-tooltip";
+  regionTooltip.hidden = true;
+  regionTooltip.setAttribute("role", "tooltip");
+  container.append(regionTooltip);
+
   let requestController: AbortController | null = null;
   let selectedRegionId: string | number | null = null;
+  let hoveredRegionName: string | null = null;
 
   const loadVisibleRegions = async (): Promise<void> => {
     requestController?.abort();
@@ -187,12 +194,43 @@ export const initialiseWeatherMap = (): void => {
     },
   );
 
+  map.on(
+    "mousemove",
+    FILL_LAYER_ID,
+    (
+      event: MapMouseEvent & {
+        features?: MapGeoJSONFeature[];
+      },
+    ) => {
+      const regionName = event.features?.[0]?.properties?.name;
+
+      map.getCanvas().style.cursor = "pointer";
+
+      if (typeof regionName !== "string" || !regionName) {
+        hoveredRegionName = null;
+        regionTooltip.hidden = true;
+        return;
+      }
+
+      if (regionName !== hoveredRegionName) {
+        hoveredRegionName = regionName;
+        regionTooltip.textContent = regionName;
+      }
+
+      regionTooltip.style.transform =
+        `translate(${event.point.x + 14}px, ${event.point.y + 14}px)`;
+      regionTooltip.hidden = false;
+    },
+  );
+
   map.on("mouseenter", FILL_LAYER_ID, () => {
     map.getCanvas().style.cursor = "pointer";
   });
 
   map.on("mouseleave", FILL_LAYER_ID, () => {
     map.getCanvas().style.cursor = "";
+    hoveredRegionName = null;
+    regionTooltip.hidden = true;
   });
 };
 

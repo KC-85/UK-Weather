@@ -14,4 +14,9 @@
   .weather-card {
     @apply rounded-2xl border border-white/10 bg-white/10 p-6 shadow-xl;
   }
+
+  .region-tooltip {
+    @apply pointer-events-none absolute left-0 top-0 z-20 max-w-72 rounded-lg border border-white/15 bg-weather-navy/95 px-3 py-2 text-sm font-semibold text-slate-50 shadow-xl;
+    will-change: transform;
+  }
 }

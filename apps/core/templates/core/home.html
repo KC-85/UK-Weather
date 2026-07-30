@@ -15,6 +15,51 @@
       id="weather-panel"
       class="absolute inset-x-4 bottom-4 z-10 md:inset-x-auto md:right-6 md:top-6 md:bottom-auto md:w-96"
       aria-live="polite"
+      aria-atomic="true"
+      hx-sync="this:replace"
     ></aside>
+
+    <template id="region-panel-loading">
+      <section
+        class="rounded-2xl border border-white/15 bg-weather-navy/95 p-6 shadow-2xl backdrop-blur"
+        role="status"
+      >
+        <div class="flex items-center gap-4">
+          <span
+            class="size-6 shrink-0 animate-spin rounded-full border-2 border-weather-sky/30 border-t-weather-sky"
+            aria-hidden="true"
+          ></span>
+          <div>
+            <p class="font-semibold">Loading region</p>
+            <p class="mt-1 text-sm text-slate-300">
+              Fetching
+              <span data-region-loading-name>the selected region</span>…
+            </p>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <template id="region-panel-error">
+      <section
+        class="rounded-2xl border border-red-400/30 bg-weather-navy/95 p-6 shadow-2xl backdrop-blur"
+        role="alert"
+      >
+        <p class="text-xs font-semibold uppercase tracking-widest text-red-300">
+          Unable to load
+        </p>
+        <h2 class="mt-2 text-xl font-bold">The region details are unavailable</h2>
+        <p class="mt-2 text-sm text-slate-300">
+          Check your connection and try selecting the region again.
+        </p>
+        <button
+          type="button"
+          class="mt-5 rounded-lg bg-weather-sky px-4 py-2 text-sm font-semibold text-weather-navy transition hover:bg-sky-300 focus:outline-none focus:ring-2 focus:ring-weather-sky focus:ring-offset-2 focus:ring-offset-weather-navy"
+          data-region-panel-retry
+        >
+          Try again
+        </button>
+      </section>
+    </template>
   </main>
 {% endblock %}
