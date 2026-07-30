@@ -1,0 +1,28 @@
+<section
+  class="rounded-2xl border border-white/15 bg-weather-navy/95 p-6 shadow-2xl backdrop-blur"
+  aria-labelledby="selected-region-name"
+>
+  <p class="text-xs font-semibold uppercase tracking-widest text-weather-sky">
+    {{ region.get_region_type_display }}
+  </p>
+  <h2 id="selected-region-name" class="mt-2 text-2xl font-bold">
+    {{ region.name }}
+  </h2>
+
+  <dl class="mt-5 grid grid-cols-2 gap-4 text-sm">
+    <div>
+      <dt class="text-slate-400">Latitude</dt>
+      <dd class="mt-1 font-mono">{{ region.forecast_point.y|floatformat:4 }}</dd>
+    </div>
+    <div>
+      <dt class="text-slate-400">Longitude</dt>
+      <dd class="mt-1 font-mono">{{ region.forecast_point.x|floatformat:4 }}</dd>
+    </div>
+  </dl>
+
+  <div class="mt-6 border-t border-white/10 pt-5">
+    <p class="text-sm text-slate-300">
+      Weather conditions for this region will appear here.
+    </p>
+  </div>
+</section>
