@@ -138,3 +138,37 @@ def test_regions_geojson_returns_empty_feature_collection(client):
 
     assert response.status_code == 200
     assert response.json()["features"] == []
+
+
+@pytest.mark.django_db
+def test_region_panel_returns_selected_region(client, region):
+    response = client.get(
+        reverse("locations:region_panel", args=[region.code])
+    )
+
+    assert response.status_code == 200
+    assert "locations/partials/region_panel.html" in [
+        template.name for template in response.templates
+    ]
+    assert response.context["region"] == region
+    assert b"City of Edinburgh" in response.content
+    assert b"Local Authority" in response.content
+
+
+@pytest.mark.django_db
+def test_region_panel_includes_forecast_coordinates(client, region):
+    response = client.get(
+        reverse("locations:region_panel", args=[region.code])
+    )
+
+    assert b"55.9533" in response.content
+    assert b"-3.1883" in response.content
+
+
+@pytest.mark.django_db
+def test_region_panel_returns_not_found_for_unknown_code(client):
+    response = client.get(
+        reverse("locations:region_panel", args=["UNKNOWN"])
+    )
+
+    assert response.status_code == 404
