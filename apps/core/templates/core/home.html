@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
   <main class="relative h-[calc(100vh-4rem)]">
@@ -7,6 +8,7 @@
       class="h-full w-full"
       data-regions-url="{% url 'locations:regions_geojson' %}"
       data-region-panel-url-template="{% url 'locations:region_panel' 'REGION_CODE' %}"
+      data-map-worker-url="{% static 'js/maplibre-gl-worker.mjs' %}"
     ></div>
 
     <aside

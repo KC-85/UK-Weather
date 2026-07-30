@@ -1,6 +1,7 @@
 import {
   Map as MapLibreMap,
   NavigationControl,
+  setWorkerUrl,
 } from "maplibre-gl";
 
 import type {
@@ -29,12 +30,18 @@ export const initialiseWeatherMap = (): void => {
   }
 
   const regionsUrl = container.dataset.regionsUrl;
+  const workerUrl = container.dataset.mapWorkerUrl;
 
   if (!regionsUrl) {
     throw new Error("The map is missing its regions endpoint URL.");
   }
 
+  if (!workerUrl) {
+    throw new Error("The map is missing its worker URL.");
+  }
+
   container.dataset.mapReady = "true";
+  setWorkerUrl(workerUrl);
 
   const map = new MapLibreMap({
     container,
