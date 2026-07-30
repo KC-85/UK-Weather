@@ -1,3 +1,5 @@
+import { initialiseWeatherMap } from "./map";
+
 type Coordinates = {
   latitude: number;
   longitude: number;
@@ -26,3 +28,5 @@ document.addEventListener("click", (event: MouseEvent): void => {
     () => button.removeAttribute("aria-busy"),
   );
 });
+
+document.addEventListener("DOMContentLoaded", initialiseWeatherMap);

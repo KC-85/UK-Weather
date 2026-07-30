@@ -1,0 +1,198 @@
+import {
+  Map as MapLibreMap,
+  NavigationControl,
+} from "maplibre-gl";
+
+import type {
+  GeoJSONSource,
+  MapGeoJSONFeature,
+  MapMouseEvent,
+} from "maplibre-gl";
+
+import type {
+  FeatureCollection,
+  MultiPolygon,
+  Polygon,
+} from "geojson";
+
+type RegionCollection = FeatureCollection<Polygon | MultiPolygon>;
+
+const SOURCE_ID = "regions";
+const FILL_LAYER_ID = "region-fill";
+const LINE_LAYER_ID = "region-outline";
+
+export const initialiseWeatherMap = (): void => {
+  const container = document.querySelector<HTMLElement>("#weather-map");
+
+  if (!container || container.dataset.mapReady === "true") {
+    return;
+  }
+
+  const regionsUrl = container.dataset.regionsUrl;
+
+  if (!regionsUrl) {
+    throw new Error("The map is missing its regions endpoint URL.");
+  }
+
+  container.dataset.mapReady = "true";
+
+  const map = new MapLibreMap({
+    container,
+    style: "https://demotiles.maplibre.org/style.json",
+    center: [-3.5, 54.8],
+    zoom: 5,
+    minZoom: 4,
+    maxZoom: 14,
+  });
+
+  map.addControl(new NavigationControl(), "top-right");
+
+  let requestController: AbortController | null = null;
+  let selectedRegionId: string | number | null = null;
+
+  const loadVisibleRegions = async (): Promise<void> => {
+    requestController?.abort();
+    requestController = new AbortController();
+
+    const bounds = map.getBounds();
+    const url = new URL(regionsUrl, window.location.origin);
+
+    url.searchParams.set(
+      "bbox",
+      [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth(),
+      ].join(","),
+    );
+
+    url.searchParams.set(
+      "tolerance",
+      simplificationTolerance(map.getZoom()).toString(),
+    );
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/geo+json",
+        },
+        signal: requestController.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Region request failed: ${response.status}`);
+      }
+
+      const regions = (await response.json()) as RegionCollection;
+      const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+
+      source?.setData(regions);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      console.error("Unable to load map regions.", error);
+    }
+  };
+
+  map.on("load", () => {
+    map.addSource(SOURCE_ID, {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: [],
+      },
+      promoteId: "code",
+    });
+
+    map.addLayer({
+      id: FILL_LAYER_ID,
+      type: "fill",
+      source: SOURCE_ID,
+      paint: {
+        "fill-color": [
+          "case",
+          ["boolean", ["feature-state", "selected"], false],
+          "#f97316",
+          "#38bdf8",
+        ],
+        "fill-opacity": 0.25,
+      },
+    });
+
+    map.addLayer({
+      id: LINE_LAYER_ID,
+      type: "line",
+      source: SOURCE_ID,
+      paint: {
+        "line-color": "#e2e8f0",
+        "line-width": 1.5,
+      },
+    });
+
+    void loadVisibleRegions();
+  });
+
+  map.on("moveend", () => {
+    void loadVisibleRegions();
+  });
+
+  map.on(
+    "click",
+    FILL_LAYER_ID,
+    (
+      event: MapMouseEvent & {
+        features?: MapGeoJSONFeature[];
+      },
+    ) => {
+      const feature = event.features?.[0];
+
+      if (!feature?.id) {
+        return;
+      }
+
+      if (selectedRegionId !== null) {
+        map.setFeatureState(
+          { source: SOURCE_ID, id: selectedRegionId },
+          { selected: false },
+        );
+      }
+
+      selectedRegionId = feature.id;
+
+      map.setFeatureState(
+        { source: SOURCE_ID, id: selectedRegionId },
+        { selected: true },
+      );
+
+      document.dispatchEvent(
+        new CustomEvent("weather:region-selected", {
+          detail: {
+            code: feature.properties?.code,
+            name: feature.properties?.name,
+            longitude: event.lngLat.lng,
+            latitude: event.lngLat.lat,
+          },
+        }),
+      );
+    },
+  );
+
+  map.on("mouseenter", FILL_LAYER_ID, () => {
+    map.getCanvas().style.cursor = "pointer";
+  });
+
+  map.on("mouseleave", FILL_LAYER_ID, () => {
+    map.getCanvas().style.cursor = "";
+  });
+};
+
+const simplificationTolerance = (zoom: number): number => {
+  if (zoom <= 5) return 0.01;
+  if (zoom <= 7) return 0.005;
+  if (zoom <= 9) return 0.001;
+
+  return 0.0002;
+};
