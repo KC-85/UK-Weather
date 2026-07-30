@@ -30,3 +30,34 @@ class Region(models.Model):
         return self.name
 
 
+class SavedLocation(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='saved_locations',
+    )
+    name = models.CharField(max_length=150)
+
+    location = models.PointField(srid=4326)
+
+    region = models.ForeignKey(
+        Region,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='saved_locations',
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'name'],
+                name='unique_saved_location_name_per_user',
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
