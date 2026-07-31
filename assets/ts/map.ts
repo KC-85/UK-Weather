@@ -17,6 +17,11 @@ import type {
 } from "geojson";
 
 type RegionCollection = FeatureCollection<Polygon | MultiPolygon>;
+type RegionSearchSelection = {
+  code: string;
+  name: string;
+  bounds: [number, number, number, number];
+};
 
 const SOURCE_ID = "regions";
 const FILL_LAYER_ID = "region-fill";
@@ -64,6 +69,27 @@ export const initialiseWeatherMap = (): void => {
   let selectedRegionId: string | number | null = null;
   let hoveredRegionName: string | null = null;
 
+  const applySelectedRegionState = (): void => {
+    if (selectedRegionId === null || !map.getSource(SOURCE_ID)) return;
+
+    map.setFeatureState(
+      { source: SOURCE_ID, id: selectedRegionId },
+      { selected: true },
+    );
+  };
+
+  const selectRegion = (regionId: string | number): void => {
+    if (selectedRegionId !== null && map.getSource(SOURCE_ID)) {
+      map.setFeatureState(
+        { source: SOURCE_ID, id: selectedRegionId },
+        { selected: false },
+      );
+    }
+
+    selectedRegionId = regionId;
+    applySelectedRegionState();
+  };
+
   const loadVisibleRegions = async (): Promise<void> => {
     requestController?.abort();
     requestController = new AbortController();
@@ -102,6 +128,7 @@ export const initialiseWeatherMap = (): void => {
       const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
 
       source?.setData(regions);
+      applySelectedRegionState();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
@@ -149,6 +176,12 @@ export const initialiseWeatherMap = (): void => {
     void loadVisibleRegions();
   });
 
+  map.on("sourcedata", (event) => {
+    if (event.sourceId === SOURCE_ID && event.isSourceLoaded) {
+      applySelectedRegionState();
+    }
+  });
+
   map.on("moveend", () => {
     void loadVisibleRegions();
   });
@@ -163,28 +196,18 @@ export const initialiseWeatherMap = (): void => {
     ) => {
       const feature = event.features?.[0];
 
-      if (!feature?.id) {
+      const regionCode = feature?.properties?.code;
+
+      if (typeof regionCode !== "string" || !regionCode) {
         return;
       }
 
-      if (selectedRegionId !== null) {
-        map.setFeatureState(
-          { source: SOURCE_ID, id: selectedRegionId },
-          { selected: false },
-        );
-      }
-
-      selectedRegionId = feature.id;
-
-      map.setFeatureState(
-        { source: SOURCE_ID, id: selectedRegionId },
-        { selected: true },
-      );
+      selectRegion(regionCode);
 
       document.dispatchEvent(
         new CustomEvent("weather:region-selected", {
           detail: {
-            code: feature.properties?.code,
+            code: regionCode,
             name: feature.properties?.name,
             longitude: event.lngLat.lng,
             latitude: event.lngLat.lat,
@@ -232,6 +255,38 @@ export const initialiseWeatherMap = (): void => {
     hoveredRegionName = null;
     regionTooltip.hidden = true;
   });
+
+  document.addEventListener(
+    "weather:region-search-selected",
+    (event: Event): void => {
+      const selection = (event as CustomEvent<RegionSearchSelection>).detail;
+
+      if (!selection?.code || selection.bounds.length !== 4) return;
+
+      const [west, south, east, north] = selection.bounds;
+      selectRegion(selection.code);
+      map.fitBounds(
+        [
+          [west, south],
+          [east, north],
+        ],
+        {
+          padding: 80,
+          maxZoom: 9,
+          duration: 900,
+        },
+      );
+
+      document.dispatchEvent(
+        new CustomEvent("weather:region-selected", {
+          detail: {
+            code: selection.code,
+            name: selection.name,
+          },
+        }),
+      );
+    },
+  );
 };
 
 const simplificationTolerance = (zoom: number): number => {

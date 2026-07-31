@@ -28,6 +28,11 @@ type RegionSelection = {
   name?: string;
 };
 
+type RegionSearchSelection = RegionSelection & {
+  name: string;
+  bounds: [number, number, number, number];
+};
+
 type HtmxRequestDetail = {
   failed?: boolean;
   successful?: boolean;
@@ -81,6 +86,50 @@ const showRegionPanelError = (panel: HTMLElement): void => {
   panel.setAttribute("aria-busy", "false");
 };
 
+const showRegionSearchError = (results: HTMLElement): void => {
+  replacePanelWithTemplate(results, "#region-search-error");
+  results.setAttribute("aria-busy", "false");
+};
+
+const selectSearchResult = (result: HTMLElement): void => {
+  const code = result.dataset.regionCode;
+  const name = result.dataset.regionName;
+  const bounds = result.dataset.regionBounds?.split(",").map(Number);
+
+  if (
+    !code ||
+    !name ||
+    !bounds ||
+    bounds.length !== 4 ||
+    !bounds.every(Number.isFinite)
+  ) {
+    return;
+  }
+
+  const input = document.querySelector<HTMLInputElement>(
+    "#region-search-input",
+  );
+  const results = document.querySelector<HTMLElement>(
+    "#region-search-results",
+  );
+
+  if (input) input.value = name;
+  results?.replaceChildren();
+
+  document.dispatchEvent(
+    new CustomEvent<RegionSearchSelection>(
+      "weather:region-search-selected",
+      {
+        detail: {
+          code,
+          name,
+          bounds: bounds as [number, number, number, number],
+        },
+      },
+    ),
+  );
+};
+
 const loadRegionPanel = (selection: RegionSelection): void => {
   const mapContainer = document.querySelector<HTMLElement>("#weather-map");
   const panel = document.querySelector<HTMLElement>("#weather-panel");
@@ -120,6 +169,15 @@ document.addEventListener("click", (event: MouseEvent): void => {
     return;
   }
 
+  const searchResult = target?.closest<HTMLElement>(
+    "[data-region-search-result]",
+  );
+
+  if (searchResult) {
+    selectSearchResult(searchResult);
+    return;
+  }
+
   const button = target?.closest<HTMLElement>("[data-use-location]");
 
   if (!button || !navigator.geolocation) return;
@@ -143,6 +201,11 @@ document.addEventListener("weather:region-selected", (event: Event): void => {
 document.addEventListener("htmx:beforeRequest", (event: Event): void => {
   const detail = (event as CustomEvent<HtmxRequestDetail>).detail;
 
+  if (detail.target?.id === "region-search-results") {
+    detail.target.setAttribute("aria-busy", "true");
+    return;
+  }
+
   if (detail.target?.id !== "weather-panel" || !detail.xhr) return;
 
   activePanelRequest = detail.xhr;
@@ -151,6 +214,16 @@ document.addEventListener("htmx:beforeRequest", (event: Event): void => {
 document.addEventListener("htmx:afterRequest", (event: Event): void => {
   const detail = (event as CustomEvent<HtmxRequestDetail>).detail;
   const panel = detail.target;
+
+  if (panel?.id === "region-search-results") {
+    panel.setAttribute("aria-busy", "false");
+
+    if (detail.failed || detail.successful === false) {
+      showRegionSearchError(panel);
+    }
+
+    return;
+  }
 
   if (
     panel?.id !== "weather-panel" ||
