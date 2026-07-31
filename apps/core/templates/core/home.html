@@ -7,6 +7,7 @@
       id="weather-map"
       class="h-full w-full"
       data-regions-url="{% url 'locations:regions_geojson' %}"
+      data-settlements-url="{% url 'locations:settlements_geojson' %}"
       data-region-panel-url-template="{% url 'locations:region_panel' 'REGION_CODE' %}"
       data-map-worker-url="{% static 'js/maplibre-gl-worker.mjs' %}"
     ></div>

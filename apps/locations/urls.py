@@ -16,6 +16,11 @@ urlpatterns = [
         name="regions_geojson",
     ),
     path(
+        "settlements.geojson",
+        views.settlements_geojson,
+        name="settlements_geojson",
+    ),
+    path(
         "regions/<str:code>/panel/",
         views.region_panel,
         name="region_panel",
