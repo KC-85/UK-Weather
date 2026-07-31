@@ -40,6 +40,7 @@ def conditions():
         precipitation_mm=0.2,
         weather_code=61,
         description="Slight rain",
+        icon_name="rain",
         cloud_cover_percent=88.0,
         wind_speed_mph=12.4,
         wind_direction_degrees=245.0,
@@ -58,6 +59,7 @@ def hourly_forecast():
             precipitation_mm=0.1,
             weather_code=2,
             description="Partly cloudy",
+            icon_name="partly-cloudy-day",
             wind_speed_mph=8.0,
             is_day=True,
         ),
@@ -68,6 +70,7 @@ def hourly_forecast():
             precipitation_mm=0.3,
             weather_code=61,
             description="Slight rain",
+            icon_name="rain",
             wind_speed_mph=10.0,
             is_day=True,
         ),
@@ -84,6 +87,7 @@ def daily_forecast():
             precipitation_sum_mm=0.2,
             weather_code=2,
             description="Partly cloudy",
+            icon_name="partly-cloudy-day",
             wind_speed_max_mph=14.0,
             wind_gusts_max_mph=28.0,
             sunrise_at=datetime(2026, 7, 31, 4, 15, tzinfo=UTC),
@@ -97,6 +101,7 @@ def daily_forecast():
             precipitation_sum_mm=4.6,
             weather_code=61,
             description="Slight rain",
+            icon_name="rain",
             wind_speed_max_mph=18.0,
             wind_gusts_max_mph=34.0,
             sunrise_at=datetime(2026, 8, 1, 4, 17, tzinfo=UTC),
@@ -163,6 +168,8 @@ def test_current_conditions_returns_normalized_forecast(
     assert b"0.1 mm" in response.content
     assert b"Seven-day forecast" in response.content
     assert b"4.6 mm" in response.content
+    assert b"/static/icons/weather.svg#rain" in response.content
+    assert b"/static/icons/weather.svg#partly-cloudy-day" in response.content
     provider.forecast.assert_called_once_with(55.9533, -3.1883)
     current_transformer.assert_called_once_with(sentinel.raw_response)
     hourly_transformer.assert_called_once_with(sentinel.raw_response)

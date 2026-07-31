@@ -1,0 +1,9 @@
+{% load static %}
+
+<svg
+  class="{{ icon_class|default:'h-10 w-10' }}"
+  aria-hidden="true"
+  focusable="false"
+>
+  <use href="{% static 'icons/weather.svg' %}#{{ icon_name }}"></use>
+</svg>

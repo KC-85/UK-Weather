@@ -13,6 +13,7 @@ from apps.weather.services.transformers import (
     normalize_daily_forecast,
     normalize_hourly_forecast,
     weather_code_description,
+    weather_code_icon,
 )
 from apps.weather.types.forecast import (
     CurrentConditions,
@@ -166,6 +167,7 @@ def test_normalize_current_conditions_returns_application_type():
         precipitation_mm=0.2,
         weather_code=61,
         description="Slight rain",
+        icon_name="rain",
         cloud_cover_percent=88.0,
         wind_speed_mph=12.4,
         wind_direction_degrees=245.0,
@@ -186,6 +188,28 @@ def test_normalize_current_conditions_returns_application_type():
 )
 def test_weather_code_description(code, description):
     assert weather_code_description(code) == description
+
+
+@pytest.mark.parametrize(
+    ("code", "is_day", "icon_name"),
+    [
+        (0, True, "clear-day"),
+        (0, False, "clear-night"),
+        (1, True, "partly-cloudy-day"),
+        (2, False, "partly-cloudy-night"),
+        (3, False, "cloudy"),
+        (45, True, "fog"),
+        (51, True, "drizzle"),
+        (61, True, "rain"),
+        (71, True, "snow"),
+        (80, True, "showers-day"),
+        (82, False, "showers-night"),
+        (95, True, "thunderstorm"),
+        (123, True, "unknown"),
+    ],
+)
+def test_weather_code_icon(code, is_day, icon_name):
+    assert weather_code_icon(code, is_day=is_day) == icon_name
 
 
 def test_normalize_current_conditions_rejects_missing_current_data():
@@ -254,6 +278,7 @@ def test_normalize_hourly_forecast_returns_application_periods():
             precipitation_mm=0.1,
             weather_code=2,
             description="Partly cloudy",
+            icon_name="partly-cloudy-day",
             wind_speed_mph=8.0,
             is_day=True,
         ),
@@ -264,6 +289,7 @@ def test_normalize_hourly_forecast_returns_application_periods():
             precipitation_mm=0.3,
             weather_code=61,
             description="Slight rain",
+            icon_name="rain",
             wind_speed_mph=10.0,
             is_day=False,
         ),
@@ -358,6 +384,7 @@ def test_normalize_daily_forecast_returns_application_periods():
             precipitation_sum_mm=0.2,
             weather_code=2,
             description="Partly cloudy",
+            icon_name="partly-cloudy-day",
             wind_speed_max_mph=14.0,
             wind_gusts_max_mph=28.0,
             sunrise_at=first_sunrise,
@@ -371,6 +398,7 @@ def test_normalize_daily_forecast_returns_application_periods():
             precipitation_sum_mm=4.6,
             weather_code=61,
             description="Slight rain",
+            icon_name="rain",
             wind_speed_max_mph=18.0,
             wind_gusts_max_mph=34.0,
             sunrise_at=second_sunrise,

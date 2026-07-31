@@ -29,10 +29,13 @@
             {{ period.forecast_at|timezone:"Europe/London"|date:"D H:i" }}
           {% endif %}
         </time>
-        <p class="mt-2 text-2xl font-bold">
+        <div class="mt-3 flex justify-center">
+          {% include "weather/partials/weather_icon.html" with icon_name=period.icon_name icon_class="h-11 w-11" %}
+        </div>
+        <p class="mt-2 text-center text-2xl font-bold">
           {{ period.temperature_c|floatformat:0 }}&deg;C
         </p>
-        <p class="mt-1 min-h-10 text-xs text-slate-300">
+        <p class="mt-1 min-h-10 text-center text-xs text-slate-300">
           {{ period.description }}
         </p>
         <dl class="mt-3 space-y-2 text-xs">

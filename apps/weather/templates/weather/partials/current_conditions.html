@@ -14,9 +14,12 @@
         {{ conditions.observed_at|timezone:"Europe/London"|date:"H:i" }}
       </p>
     </div>
-    <p class="text-4xl font-bold tracking-tight">
-      {{ conditions.temperature_c|floatformat:0 }}&deg;C
-    </p>
+    <div class="flex shrink-0 items-center gap-2">
+      {% include "weather/partials/weather_icon.html" with icon_name=conditions.icon_name icon_class="h-14 w-14" %}
+      <p class="text-4xl font-bold tracking-tight">
+        {{ conditions.temperature_c|floatformat:0 }}&deg;C
+      </p>
+    </div>
   </div>
 
   <dl class="mt-5 grid grid-cols-2 gap-x-4 gap-y-5 text-sm">

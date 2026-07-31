@@ -11,6 +11,7 @@ class CurrentConditions:
     precipitation_mm: float
     weather_code: int
     description: str
+    icon_name: str
     cloud_cover_percent: float
     wind_speed_mph: float
     wind_direction_degrees: float
@@ -26,6 +27,7 @@ class HourlyForecastPeriod:
     precipitation_mm: float
     weather_code: int
     description: str
+    icon_name: str
     wind_speed_mph: float
     is_day: bool
 
@@ -38,6 +40,7 @@ class DailyForecastPeriod:
     precipitation_sum_mm: float
     weather_code: int
     description: str
+    icon_name: str
     wind_speed_max_mph: float
     wind_gusts_max_mph: float
     sunrise_at: datetime

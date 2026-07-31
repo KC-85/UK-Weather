@@ -116,6 +116,29 @@ def weather_code_description(code: int) -> str:
     return WMO_WEATHER_DESCRIPTIONS.get(code, "Unknown conditions")
 
 
+def weather_code_icon(code: int, *, is_day: bool = True) -> str:
+    """Map a WMO weather code to a local SVG symbol name."""
+    if code == 0:
+        return "clear-day" if is_day else "clear-night"
+    if code in {1, 2}:
+        return "partly-cloudy-day" if is_day else "partly-cloudy-night"
+    if code == 3:
+        return "cloudy"
+    if code in {45, 48}:
+        return "fog"
+    if code in {51, 53, 55, 56, 57}:
+        return "drizzle"
+    if code in {61, 63, 65, 66, 67}:
+        return "rain"
+    if code in {71, 73, 75, 77, 85, 86}:
+        return "snow"
+    if code in {80, 81, 82}:
+        return "showers-day" if is_day else "showers-night"
+    if code in {95, 96, 99}:
+        return "thunderstorm"
+    return "unknown"
+
+
 def normalize_current_conditions(
     response: ForecastResponse,
 ) -> CurrentConditions:
@@ -127,6 +150,7 @@ def normalize_current_conditions(
         )
 
     weather_code = int(_current_value(current, "weather_code"))
+    is_day = bool(_current_value(current, "is_day"))
 
     return CurrentConditions(
         observed_at=datetime.fromtimestamp(current.Time(), tz=UTC),
@@ -142,6 +166,7 @@ def normalize_current_conditions(
         precipitation_mm=_current_value(current, "precipitation"),
         weather_code=weather_code,
         description=weather_code_description(weather_code),
+        icon_name=weather_code_icon(weather_code, is_day=is_day),
         cloud_cover_percent=_current_value(current, "cloud_cover"),
         wind_speed_mph=_current_value(current, "wind_speed_10m"),
         wind_direction_degrees=_current_value(
@@ -149,7 +174,7 @@ def normalize_current_conditions(
             "wind_direction_10m",
         ),
         wind_gusts_mph=_current_value(current, "wind_gusts_10m"),
-        is_day=bool(_current_value(current, "is_day")),
+        is_day=is_day,
     )
 
 
@@ -191,6 +216,7 @@ def normalize_hourly_forecast(
         weather_code = int(
             _hourly_value(values_by_name, "weather_code", index)
         )
+        is_day = bool(_hourly_value(values_by_name, "is_day", index))
         forecast.append(
             HourlyForecastPeriod(
                 forecast_at=datetime.fromtimestamp(
@@ -214,14 +240,16 @@ def normalize_hourly_forecast(
                 ),
                 weather_code=weather_code,
                 description=weather_code_description(weather_code),
+                icon_name=weather_code_icon(
+                    weather_code,
+                    is_day=is_day,
+                ),
                 wind_speed_mph=_hourly_value(
                     values_by_name,
                     "wind_speed_10m",
                     index,
                 ),
-                is_day=bool(
-                    _hourly_value(values_by_name, "is_day", index)
-                ),
+                is_day=is_day,
             )
         )
 
@@ -290,6 +318,7 @@ def normalize_daily_forecast(
                 ),
                 weather_code=weather_code,
                 description=weather_code_description(weather_code),
+                icon_name=weather_code_icon(weather_code),
                 wind_speed_max_mph=_daily_value(
                     values_by_name,
                     "wind_speed_10m_max",
