@@ -2,7 +2,7 @@ import pytest
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.urls import reverse
 
-from apps.locations.models import Region
+from apps.locations.models import Region, Settlement
 
 
 @pytest.fixture
@@ -29,6 +29,39 @@ def region(db):
         boundary=boundary,
         forecast_point=Point(-3.1883, 55.9533, srid=4326),
     )
+
+
+@pytest.fixture
+def settlements(db, region):
+    city = Settlement.objects.create(
+        source=Settlement.Sources.OS_OPEN_NAMES,
+        source_id="os-city",
+        name="Edinburgh",
+        settlement_type=Settlement.Types.CITY,
+        country=Settlement.Countries.SCOTLAND,
+        location=Point(-3.1883, 55.9533, srid=4326),
+        region=region,
+    )
+    town = Settlement.objects.create(
+        source=Settlement.Sources.OS_OPEN_NAMES,
+        source_id="os-town",
+        name="Leith",
+        alternate_name="Lìte",
+        settlement_type=Settlement.Types.TOWN,
+        country=Settlement.Countries.SCOTLAND,
+        location=Point(-3.10, 55.97, srid=4326),
+        region=region,
+    )
+    village = Settlement.objects.create(
+        source=Settlement.Sources.OS_OPEN_NAMES,
+        source_id="os-village",
+        name="Test Village",
+        settlement_type=Settlement.Types.VILLAGE,
+        country=Settlement.Countries.SCOTLAND,
+        location=Point(-3.15, 55.96, srid=4326),
+        region=region,
+    )
+    return city, town, village
 
 
 @pytest.mark.django_db
@@ -138,6 +171,118 @@ def test_regions_geojson_returns_empty_feature_collection(client):
 
     assert response.status_code == 200
     assert response.json()["features"] == []
+
+
+@pytest.mark.django_db
+def test_settlements_geojson_returns_cities_and_towns(
+    client,
+    settlements,
+):
+    response = client.get(reverse("locations:settlements_geojson"))
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/geo+json"
+    data = response.json()
+    assert data["type"] == "FeatureCollection"
+    assert [feature["id"] for feature in data["features"]] == [
+        "os-city",
+        "os-town",
+    ]
+
+
+@pytest.mark.django_db
+def test_settlements_geojson_includes_point_and_authority_properties(
+    client,
+    settlements,
+    region,
+):
+    response = client.get(reverse("locations:settlements_geojson"))
+
+    feature = response.json()["features"][1]
+    assert feature["geometry"] == {
+        "type": "Point",
+        "coordinates": [-3.1, 55.97],
+    }
+    assert feature["properties"] == {
+        "source_id": "os-town",
+        "name": "Leith",
+        "alternate_name": "Lìte",
+        "settlement_type": Settlement.Types.TOWN,
+        "population": None,
+        "region_code": region.code,
+        "region_name": region.name,
+    }
+
+
+@pytest.mark.django_db
+def test_settlements_geojson_filters_by_bounding_box(client, settlements):
+    response = client.get(
+        reverse("locations:settlements_geojson"),
+        {"bbox": "-3.20,55.94,-3.17,55.97"},
+    )
+
+    assert [
+        feature["properties"]["name"]
+        for feature in response.json()["features"]
+    ] == ["Edinburgh"]
+
+
+@pytest.mark.django_db
+def test_settlements_geojson_hides_towns_at_national_zoom(
+    client,
+    settlements,
+):
+    response = client.get(
+        reverse("locations:settlements_geojson"),
+        {"zoom": "5"},
+    )
+
+    assert [
+        feature["properties"]["settlement_type"]
+        for feature in response.json()["features"]
+    ] == [Settlement.Types.CITY]
+
+
+@pytest.mark.django_db
+def test_settlements_geojson_includes_towns_when_zoomed_in(
+    client,
+    settlements,
+):
+    response = client.get(
+        reverse("locations:settlements_geojson"),
+        {"zoom": "5.5"},
+    )
+
+    assert len(response.json()["features"]) == 2
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("zoom", ["invalid", "nan", "-1", "25"])
+def test_settlements_geojson_rejects_invalid_zoom(client, zoom):
+    response = client.get(
+        reverse("locations:settlements_geojson"),
+        {"zoom": zoom},
+    )
+
+    assert response.status_code == 400
+    assert "error" in response.json()
+
+
+@pytest.mark.django_db
+def test_settlements_geojson_rejects_invalid_bounding_box(client):
+    response = client.get(
+        reverse("locations:settlements_geojson"),
+        {"bbox": "invalid"},
+    )
+
+    assert response.status_code == 400
+    assert "error" in response.json()
+
+
+def test_settlements_geojson_rejects_post(client):
+    response = client.post(reverse("locations:settlements_geojson"))
+
+    assert response.status_code == 405
 
 
 @pytest.mark.django_db
@@ -299,3 +444,4 @@ def test_home_includes_region_search_controls(client):
     assert b'id="region-search-input"' in response.content
     assert b'id="region-search-results"' in response.content
     assert b'id="region-search-error"' in response.content
+    assert reverse("locations:settlements_geojson").encode() in response.content

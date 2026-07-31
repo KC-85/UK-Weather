@@ -13,11 +13,14 @@ from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET
 
 from .forms import LocationSearchForm
-from .models import Region
+from .models import Region, Settlement
 
 DEFAULT_SIMPLIFICATION_TOLERANCE = 0.001
 MAX_SIMPLIFICATION_TOLERANCE = 0.1
 REGION_SEARCH_LIMIT = 8
+TOWNS_MINIMUM_ZOOM = 5.5
+MINIMUM_MAP_ZOOM = 0
+MAXIMUM_MAP_ZOOM = 24
 
 
 class SimplifyPreserveTopology(GeomOutputGeoFunc):
@@ -113,6 +116,71 @@ def regions_geojson(request):
     )
 
 
+@require_GET
+def settlements_geojson(request):
+    try:
+        bounds = _parse_bbox(request.GET.get("bbox"))
+        zoom = _parse_zoom(request.GET.get("zoom"))
+    except ValueError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+
+    settlements = Settlement.objects.filter(
+        settlement_type__in=(
+            Settlement.Types.CITY,
+            Settlement.Types.TOWN,
+        )
+    )
+    if bounds is not None:
+        settlements = settlements.filter(location__intersects=bounds)
+    if zoom is not None and zoom < TOWNS_MINIMUM_ZOOM:
+        settlements = settlements.filter(
+            settlement_type=Settlement.Types.CITY
+        )
+
+    settlements = settlements.values(
+        "source_id",
+        "name",
+        "alternate_name",
+        "settlement_type",
+        "population",
+        "location",
+        "region__code",
+        "region__name",
+    )
+
+    features = [
+        {
+            "type": "Feature",
+            "id": settlement["source_id"],
+            "properties": {
+                "source_id": settlement["source_id"],
+                "name": settlement["name"],
+                "alternate_name": settlement["alternate_name"],
+                "settlement_type": settlement["settlement_type"],
+                "population": settlement["population"],
+                "region_code": settlement["region__code"],
+                "region_name": settlement["region__name"],
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    settlement["location"].x,
+                    settlement["location"].y,
+                ],
+            },
+        }
+        for settlement in settlements
+    ]
+
+    return JsonResponse(
+        {
+            "type": "FeatureCollection",
+            "features": features,
+        },
+        content_type="application/geo+json",
+    )
+
+
 def _parse_bbox(raw_bbox):
     if raw_bbox is None:
         return None
@@ -158,3 +226,25 @@ def _parse_tolerance(raw_tolerance):
         )
 
     return tolerance
+
+
+def _parse_zoom(raw_zoom):
+    if raw_zoom is None:
+        return None
+
+    try:
+        zoom = float(raw_zoom)
+    except ValueError as error:
+        raise ValueError("zoom must be a number.") from error
+
+    if (
+        not math.isfinite(zoom)
+        or zoom < MINIMUM_MAP_ZOOM
+        or zoom > MAXIMUM_MAP_ZOOM
+    ):
+        raise ValueError(
+            f"zoom must be between {MINIMUM_MAP_ZOOM} and "
+            f"{MAXIMUM_MAP_ZOOM}."
+        )
+
+    return zoom
