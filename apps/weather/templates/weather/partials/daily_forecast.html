@@ -1,3 +1,82 @@
-<section aria-labelledby="daily-forecast-heading">
-  <h2 id="daily-forecast-heading">Seven-day forecast</h2>
+{% load tz %}
+
+<section
+  class="mt-6 border-t border-white/10 pt-5"
+  aria-labelledby="daily-forecast-heading"
+>
+  <div class="flex items-baseline justify-between gap-4">
+    <h3 id="daily-forecast-heading" class="text-lg font-bold">
+      Seven-day forecast
+    </h3>
+    <p class="text-xs text-slate-400">UKMO model</p>
+  </div>
+
+  <div class="mt-4 space-y-3" aria-label="Daily weather periods">
+    {% for period in daily_forecast %}
+      <article class="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <time
+              class="text-sm font-bold text-weather-sky"
+              datetime="{{ period.forecast_date|date:'Y-m-d' }}"
+            >
+              {% if forloop.first %}
+                Today
+              {% else %}
+                {{ period.forecast_date|date:"D j M" }}
+              {% endif %}
+            </time>
+            <p class="mt-1 text-sm text-slate-300">
+              {{ period.description }}
+            </p>
+          </div>
+          <p class="shrink-0 text-lg font-bold">
+            {{ period.temperature_max_c|floatformat:0 }}&deg;
+            <span class="font-medium text-slate-400">
+              / {{ period.temperature_min_c|floatformat:0 }}&deg;C
+            </span>
+          </p>
+        </div>
+
+        <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+          <div>
+            <dt class="text-slate-400">Rainfall</dt>
+            <dd class="mt-1 font-semibold">
+              {{ period.precipitation_sum_mm|floatformat:1 }} mm
+            </dd>
+          </div>
+          <div>
+            <dt class="text-slate-400">Max wind</dt>
+            <dd class="mt-1 font-semibold">
+              {{ period.wind_speed_max_mph|floatformat:1 }} mph
+            </dd>
+          </div>
+          <div>
+            <dt class="text-slate-400">Sunrise / sunset</dt>
+            <dd class="mt-1 font-semibold">
+              {{ period.sunrise_at|timezone:"Europe/London"|date:"H:i" }}
+              /
+              {{ period.sunset_at|timezone:"Europe/London"|date:"H:i" }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-slate-400">Daylight</dt>
+            <dd class="mt-1 font-semibold">
+              {{ period.daylight_hours|floatformat:1 }} hours
+            </dd>
+          </div>
+          <div class="col-span-2">
+            <dt class="text-slate-400">Maximum gusts</dt>
+            <dd class="mt-1 font-semibold">
+              {{ period.wind_gusts_max_mph|floatformat:1 }} mph
+            </dd>
+          </div>
+        </dl>
+      </article>
+    {% empty %}
+      <p class="text-sm text-slate-300">
+        No daily forecast is currently available.
+      </p>
+    {% endfor %}
+  </div>
 </section>
