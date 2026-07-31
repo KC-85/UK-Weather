@@ -5,6 +5,8 @@ from openmeteo_requests import OpenMeteoRequestsError
 
 from apps.weather.services.client import (
     CURRENT_VARIABLES,
+    HOURLY_FORECAST_HOURS,
+    HOURLY_VARIABLES,
     OPEN_METEO_CACHE_NAME,
     OPEN_METEO_CACHE_SECONDS,
     OPEN_METEO_FORECAST_URL,
@@ -15,7 +17,7 @@ from apps.weather.services.client import (
 from apps.weather.services.exceptions import WeatherServiceError
 
 
-def test_open_meteo_client_requests_current_ukmo_forecast():
+def test_open_meteo_client_requests_current_and_hourly_ukmo_forecast():
     api_client = Mock()
     api_client.weather_api.return_value = [sentinel.response]
     client = OpenMeteoClient(api_client=api_client)
@@ -29,9 +31,10 @@ def test_open_meteo_client_requests_current_ukmo_forecast():
             "latitude": 55.9533,
             "longitude": -3.1883,
             "current": list(CURRENT_VARIABLES),
+            "hourly": list(HOURLY_VARIABLES),
             "models": "ukmo_seamless",
             "timezone": "Europe/London",
-            "forecast_days": 7,
+            "forecast_hours": HOURLY_FORECAST_HOURS,
             "wind_speed_unit": "mph",
         },
         timeout=OPEN_METEO_TIMEOUT_SECONDS,

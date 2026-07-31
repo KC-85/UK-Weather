@@ -7,7 +7,10 @@ from django.urls import reverse
 
 from apps.locations.models import Region
 from apps.weather.services.exceptions import WeatherServiceError
-from apps.weather.types.forecast import CurrentConditions
+from apps.weather.types.forecast import (
+    CurrentConditions,
+    HourlyForecastPeriod,
+)
 
 
 @pytest.fixture
@@ -44,6 +47,32 @@ def conditions():
     )
 
 
+@pytest.fixture
+def hourly_forecast():
+    return [
+        HourlyForecastPeriod(
+            forecast_at=datetime(2026, 7, 31, 14, 0, tzinfo=UTC),
+            temperature_c=16.0,
+            apparent_temperature_c=15.0,
+            precipitation_mm=0.1,
+            weather_code=2,
+            description="Partly cloudy",
+            wind_speed_mph=8.0,
+            is_day=True,
+        ),
+        HourlyForecastPeriod(
+            forecast_at=datetime(2026, 7, 31, 15, 0, tzinfo=UTC),
+            temperature_c=15.0,
+            apparent_temperature_c=14.0,
+            precipitation_mm=0.3,
+            weather_code=61,
+            description="Slight rain",
+            wind_speed_mph=10.0,
+            is_day=True,
+        ),
+    ]
+
+
 def test_weather_detail(client):
     response = client.get(reverse("weather:detail", args=["london"]))
 
@@ -55,19 +84,25 @@ def test_current_conditions_returns_normalized_forecast(
     client,
     region,
     conditions,
+    hourly_forecast,
     monkeypatch,
 ):
     provider = Mock()
     provider.forecast.return_value = sentinel.raw_response
     provider_factory = Mock(return_value=provider)
-    transformer = Mock(return_value=conditions)
+    current_transformer = Mock(return_value=conditions)
+    hourly_transformer = Mock(return_value=hourly_forecast)
     monkeypatch.setattr(
         "apps.weather.views.OpenMeteoClient",
         provider_factory,
     )
     monkeypatch.setattr(
         "apps.weather.views.normalize_current_conditions",
-        transformer,
+        current_transformer,
+    )
+    monkeypatch.setattr(
+        "apps.weather.views.normalize_hourly_forecast",
+        hourly_transformer,
     )
 
     response = client.get(
@@ -79,12 +114,16 @@ def test_current_conditions_returns_normalized_forecast(
         template.name for template in response.templates
     ]
     assert response.context["conditions"] == conditions
+    assert response.context["hourly_forecast"] == hourly_forecast
     assert response.context["region"] == region
     assert b"Slight rain" in response.content
     assert b"12.4 mph" in response.content
     assert b"City of Edinburgh" in response.content
+    assert b"Hourly forecast" in response.content
+    assert b"0.1 mm" in response.content
     provider.forecast.assert_called_once_with(55.9533, -3.1883)
-    transformer.assert_called_once_with(sentinel.raw_response)
+    current_transformer.assert_called_once_with(sentinel.raw_response)
+    hourly_transformer.assert_called_once_with(sentinel.raw_response)
 
 
 @pytest.mark.django_db

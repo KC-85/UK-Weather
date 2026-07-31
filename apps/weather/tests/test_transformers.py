@@ -2,13 +2,20 @@ from datetime import UTC, datetime
 
 import pytest
 
-from apps.weather.services.client import CURRENT_VARIABLES
+from apps.weather.services.client import (
+    CURRENT_VARIABLES,
+    HOURLY_VARIABLES,
+)
 from apps.weather.services.exceptions import WeatherServiceError
 from apps.weather.services.transformers import (
     normalize_current_conditions,
+    normalize_hourly_forecast,
     weather_code_description,
 )
-from apps.weather.types.forecast import CurrentConditions
+from apps.weather.types.forecast import (
+    CurrentConditions,
+    HourlyForecastPeriod,
+)
 
 
 class FakeVariable:
@@ -38,12 +45,52 @@ class FakeCurrentWeather:
             return None
 
 
+class FakeHourlyVariable:
+    def __init__(self, values: list[float]) -> None:
+        self.values = values
+
+    def ValuesAsNumpy(self) -> list[float]:
+        return self.values
+
+
+class FakeHourlyWeather:
+    def __init__(
+        self,
+        starts_at: datetime,
+        values: list[list[float]],
+        interval: int = 3600,
+    ) -> None:
+        self.starts_at = starts_at
+        self.values = values
+        self.interval = interval
+
+    def Time(self) -> int:
+        return int(self.starts_at.timestamp())
+
+    def Interval(self) -> int:
+        return self.interval
+
+    def Variables(self, index: int) -> FakeHourlyVariable | None:
+        try:
+            return FakeHourlyVariable(self.values[index])
+        except IndexError:
+            return None
+
+
 class FakeForecastResponse:
-    def __init__(self, current: FakeCurrentWeather | None) -> None:
+    def __init__(
+        self,
+        current: FakeCurrentWeather | None,
+        hourly: FakeHourlyWeather | None = None,
+    ) -> None:
         self.current = current
+        self.hourly = hourly
 
     def Current(self) -> FakeCurrentWeather | None:
         return self.current
+
+    def Hourly(self) -> FakeHourlyWeather | None:
+        return self.hourly
 
 
 def test_normalize_current_conditions_returns_application_type():
@@ -135,3 +182,100 @@ def test_normalize_current_conditions_rejects_non_finite_value():
         match="invalid value for: temperature_2m",
     ):
         normalize_current_conditions(response)
+
+
+def test_normalize_hourly_forecast_returns_application_periods():
+    starts_at = datetime(2026, 7, 31, 14, 0, tzinfo=UTC)
+    response = FakeForecastResponse(
+        current=None,
+        hourly=FakeHourlyWeather(
+            starts_at,
+            [
+                [16.0, 15.0],
+                [15.0, 14.0],
+                [0.1, 0.3],
+                [2.0, 61.0],
+                [8.0, 10.0],
+                [1.0, 0.0],
+            ],
+        ),
+    )
+
+    forecast = normalize_hourly_forecast(response)
+
+    assert forecast == [
+        HourlyForecastPeriod(
+            forecast_at=starts_at,
+            temperature_c=16.0,
+            apparent_temperature_c=15.0,
+            precipitation_mm=0.1,
+            weather_code=2,
+            description="Partly cloudy",
+            wind_speed_mph=8.0,
+            is_day=True,
+        ),
+        HourlyForecastPeriod(
+            forecast_at=datetime(2026, 7, 31, 15, 0, tzinfo=UTC),
+            temperature_c=15.0,
+            apparent_temperature_c=14.0,
+            precipitation_mm=0.3,
+            weather_code=61,
+            description="Slight rain",
+            wind_speed_mph=10.0,
+            is_day=False,
+        ),
+    ]
+
+
+def test_normalize_hourly_forecast_respects_limit():
+    starts_at = datetime(2026, 7, 31, 14, 0, tzinfo=UTC)
+    values = [[0.0, 1.0] for _ in HOURLY_VARIABLES]
+    response = FakeForecastResponse(
+        current=None,
+        hourly=FakeHourlyWeather(starts_at, values),
+    )
+
+    forecast = normalize_hourly_forecast(response, limit=1)
+
+    assert len(forecast) == 1
+
+
+def test_normalize_hourly_forecast_rejects_missing_hourly_data():
+    response = FakeForecastResponse(current=None, hourly=None)
+
+    with pytest.raises(
+        WeatherServiceError,
+        match="no hourly forecast",
+    ):
+        normalize_hourly_forecast(response)
+
+
+def test_normalize_hourly_forecast_rejects_missing_variable():
+    starts_at = datetime(2026, 7, 31, 14, 0, tzinfo=UTC)
+    values = [[0.0] for _ in range(len(HOURLY_VARIABLES) - 1)]
+    response = FakeForecastResponse(
+        current=None,
+        hourly=FakeHourlyWeather(starts_at, values),
+    )
+
+    with pytest.raises(
+        WeatherServiceError,
+        match="omitted hourly variable: is_day",
+    ):
+        normalize_hourly_forecast(response)
+
+
+def test_normalize_hourly_forecast_rejects_inconsistent_periods():
+    starts_at = datetime(2026, 7, 31, 14, 0, tzinfo=UTC)
+    values = [[0.0, 1.0] for _ in HOURLY_VARIABLES]
+    values[0] = [0.0]
+    response = FakeForecastResponse(
+        current=None,
+        hourly=FakeHourlyWeather(starts_at, values),
+    )
+
+    with pytest.raises(
+        WeatherServiceError,
+        match="inconsistent hourly data",
+    ):
+        normalize_hourly_forecast(response)
