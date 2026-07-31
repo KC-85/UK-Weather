@@ -1,14 +1,18 @@
 import math
 from datetime import UTC, datetime
 from typing import Protocol
+from zoneinfo import ZoneInfo
 
 from apps.weather.types.forecast import (
     CurrentConditions,
+    DailyForecastPeriod,
     HourlyForecastPeriod,
 )
 
 from .client import (
     CURRENT_VARIABLES,
+    DAILY_FORECAST_DAYS,
+    DAILY_VARIABLES,
     HOURLY_FORECAST_HOURS,
     HOURLY_VARIABLES,
 )
@@ -51,6 +55,11 @@ CURRENT_VARIABLE_INDEX = {
 HOURLY_VARIABLE_INDEX = {
     name: index for index, name in enumerate(HOURLY_VARIABLES)
 }
+DAILY_VARIABLE_INDEX = {
+    name: index for index, name in enumerate(DAILY_VARIABLES)
+}
+DAILY_TIMESTAMP_VARIABLES = {"sunrise", "sunset"}
+UK_TIMEZONE = ZoneInfo("Europe/London")
 
 
 class CurrentVariable(Protocol):
@@ -81,10 +90,26 @@ class HourlyWeather(Protocol):
     def Variables(self, index: int) -> HourlyVariable | None: ...
 
 
+class DailyVariable(Protocol):
+    def ValuesAsNumpy(self) -> HourlyValues: ...
+
+    def ValuesInt64AsNumpy(self) -> HourlyValues: ...
+
+
+class DailyWeather(Protocol):
+    def Time(self) -> int: ...
+
+    def Interval(self) -> int: ...
+
+    def Variables(self, index: int) -> DailyVariable | None: ...
+
+
 class ForecastResponse(Protocol):
     def Current(self) -> CurrentWeather | None: ...
 
     def Hourly(self) -> HourlyWeather | None: ...
+
+    def Daily(self) -> DailyWeather | None: ...
 
 
 def weather_code_description(code: int) -> str:
@@ -203,6 +228,102 @@ def normalize_hourly_forecast(
     return forecast
 
 
+def normalize_daily_forecast(
+    response: ForecastResponse,
+    limit: int = DAILY_FORECAST_DAYS,
+) -> list[DailyForecastPeriod]:
+    """Convert Open-Meteo daily arrays into forecast periods."""
+    daily = response.Daily()
+    if daily is None:
+        raise WeatherServiceError("Open-Meteo returned no daily forecast.")
+
+    if limit <= 0:
+        raise ValueError("Daily forecast limit must be positive.")
+
+    interval = daily.Interval()
+    if interval <= 0:
+        raise WeatherServiceError(
+            "Open-Meteo returned an invalid daily interval."
+        )
+
+    values_by_name = {
+        name: _daily_values(daily, name) for name in DAILY_VARIABLES
+    }
+    lengths = {len(values) for values in values_by_name.values()}
+
+    if not lengths or lengths == {0}:
+        raise WeatherServiceError("Open-Meteo returned no daily periods.")
+
+    if len(lengths) != 1:
+        raise WeatherServiceError(
+            "Open-Meteo returned inconsistent daily data."
+        )
+
+    period_count = min(limit, lengths.pop())
+    forecast = []
+
+    for index in range(period_count):
+        weather_code = int(
+            _daily_value(values_by_name, "weather_code", index)
+        )
+        period_start = datetime.fromtimestamp(
+            daily.Time() + (index * interval),
+            tz=UTC,
+        )
+        forecast.append(
+            DailyForecastPeriod(
+                forecast_date=period_start.astimezone(UK_TIMEZONE).date(),
+                temperature_max_c=_daily_value(
+                    values_by_name,
+                    "temperature_2m_max",
+                    index,
+                ),
+                temperature_min_c=_daily_value(
+                    values_by_name,
+                    "temperature_2m_min",
+                    index,
+                ),
+                precipitation_sum_mm=_daily_value(
+                    values_by_name,
+                    "precipitation_sum",
+                    index,
+                ),
+                weather_code=weather_code,
+                description=weather_code_description(weather_code),
+                wind_speed_max_mph=_daily_value(
+                    values_by_name,
+                    "wind_speed_10m_max",
+                    index,
+                ),
+                wind_gusts_max_mph=_daily_value(
+                    values_by_name,
+                    "wind_gusts_10m_max",
+                    index,
+                ),
+                sunrise_at=_daily_datetime(
+                    values_by_name,
+                    "sunrise",
+                    index,
+                ),
+                sunset_at=_daily_datetime(
+                    values_by_name,
+                    "sunset",
+                    index,
+                ),
+                daylight_hours=(
+                    _daily_value(
+                        values_by_name,
+                        "daylight_duration",
+                        index,
+                    )
+                    / 3600
+                ),
+            )
+        )
+
+    return forecast
+
+
 def _current_value(current: CurrentWeather, variable_name: str) -> float:
     index = CURRENT_VARIABLE_INDEX[variable_name]
     variable = current.Variables(index)
@@ -250,3 +371,53 @@ def _hourly_value(
         )
 
     return value
+
+
+def _daily_values(
+    daily: DailyWeather,
+    variable_name: str,
+) -> HourlyValues:
+    index = DAILY_VARIABLE_INDEX[variable_name]
+    variable = daily.Variables(index)
+
+    if variable is None:
+        raise WeatherServiceError(
+            f"Open-Meteo omitted daily variable: {variable_name}."
+        )
+
+    if variable_name in DAILY_TIMESTAMP_VARIABLES:
+        return variable.ValuesInt64AsNumpy()
+
+    return variable.ValuesAsNumpy()
+
+
+def _daily_value(
+    values_by_name: dict[str, HourlyValues],
+    variable_name: str,
+    index: int,
+) -> float:
+    value = float(values_by_name[variable_name][index])
+
+    if not math.isfinite(value):
+        raise WeatherServiceError(
+            f"Open-Meteo returned an invalid daily value for: "
+            f"{variable_name}."
+        )
+
+    return value
+
+
+def _daily_datetime(
+    values_by_name: dict[str, HourlyValues],
+    variable_name: str,
+    index: int,
+) -> datetime:
+    timestamp = _daily_value(values_by_name, variable_name, index)
+
+    if timestamp <= 0:
+        raise WeatherServiceError(
+            f"Open-Meteo returned an invalid daily value for: "
+            f"{variable_name}."
+        )
+
+    return datetime.fromtimestamp(timestamp, tz=UTC)

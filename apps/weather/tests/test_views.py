@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from unittest.mock import Mock, sentinel
 
 import pytest
@@ -9,6 +9,7 @@ from apps.locations.models import Region
 from apps.weather.services.exceptions import WeatherServiceError
 from apps.weather.types.forecast import (
     CurrentConditions,
+    DailyForecastPeriod,
     HourlyForecastPeriod,
 )
 
@@ -73,6 +74,38 @@ def hourly_forecast():
     ]
 
 
+@pytest.fixture
+def daily_forecast():
+    return [
+        DailyForecastPeriod(
+            forecast_date=date(2026, 7, 31),
+            temperature_max_c=17.0,
+            temperature_min_c=9.0,
+            precipitation_sum_mm=0.2,
+            weather_code=2,
+            description="Partly cloudy",
+            wind_speed_max_mph=14.0,
+            wind_gusts_max_mph=28.0,
+            sunrise_at=datetime(2026, 7, 31, 4, 15, tzinfo=UTC),
+            sunset_at=datetime(2026, 7, 31, 20, 22, tzinfo=UTC),
+            daylight_hours=16.1,
+        ),
+        DailyForecastPeriod(
+            forecast_date=date(2026, 8, 1),
+            temperature_max_c=16.0,
+            temperature_min_c=10.0,
+            precipitation_sum_mm=4.6,
+            weather_code=61,
+            description="Slight rain",
+            wind_speed_max_mph=18.0,
+            wind_gusts_max_mph=34.0,
+            sunrise_at=datetime(2026, 8, 1, 4, 17, tzinfo=UTC),
+            sunset_at=datetime(2026, 8, 1, 20, 20, tzinfo=UTC),
+            daylight_hours=16.0,
+        ),
+    ]
+
+
 def test_weather_detail(client):
     response = client.get(reverse("weather:detail", args=["london"]))
 
@@ -85,6 +118,7 @@ def test_current_conditions_returns_normalized_forecast(
     region,
     conditions,
     hourly_forecast,
+    daily_forecast,
     monkeypatch,
 ):
     provider = Mock()
@@ -92,6 +126,7 @@ def test_current_conditions_returns_normalized_forecast(
     provider_factory = Mock(return_value=provider)
     current_transformer = Mock(return_value=conditions)
     hourly_transformer = Mock(return_value=hourly_forecast)
+    daily_transformer = Mock(return_value=daily_forecast)
     monkeypatch.setattr(
         "apps.weather.views.OpenMeteoClient",
         provider_factory,
@@ -104,6 +139,10 @@ def test_current_conditions_returns_normalized_forecast(
         "apps.weather.views.normalize_hourly_forecast",
         hourly_transformer,
     )
+    monkeypatch.setattr(
+        "apps.weather.views.normalize_daily_forecast",
+        daily_transformer,
+    )
 
     response = client.get(
         reverse("weather:current_conditions", args=[region.code])
@@ -114,6 +153,7 @@ def test_current_conditions_returns_normalized_forecast(
         template.name for template in response.templates
     ]
     assert response.context["conditions"] == conditions
+    assert response.context["daily_forecast"] == daily_forecast
     assert response.context["hourly_forecast"] == hourly_forecast
     assert response.context["region"] == region
     assert b"Slight rain" in response.content
@@ -121,9 +161,12 @@ def test_current_conditions_returns_normalized_forecast(
     assert b"City of Edinburgh" in response.content
     assert b"Hourly forecast" in response.content
     assert b"0.1 mm" in response.content
+    assert b"Seven-day forecast" in response.content
+    assert b"4.6 mm" in response.content
     provider.forecast.assert_called_once_with(55.9533, -3.1883)
     current_transformer.assert_called_once_with(sentinel.raw_response)
     hourly_transformer.assert_called_once_with(sentinel.raw_response)
+    daily_transformer.assert_called_once_with(sentinel.raw_response)
 
 
 @pytest.mark.django_db

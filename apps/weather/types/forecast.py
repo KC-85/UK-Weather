@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,3 +28,18 @@ class HourlyForecastPeriod:
     description: str
     wind_speed_mph: float
     is_day: bool
+
+
+@dataclass(frozen=True, slots=True)
+class DailyForecastPeriod:
+    forecast_date: date
+    temperature_max_c: float
+    temperature_min_c: float
+    precipitation_sum_mm: float
+    weather_code: int
+    description: str
+    wind_speed_max_mph: float
+    wind_gusts_max_mph: float
+    sunrise_at: datetime
+    sunset_at: datetime
+    daylight_hours: float
