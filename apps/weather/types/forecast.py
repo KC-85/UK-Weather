@@ -6,5 +6,13 @@ from datetime import datetime
 class CurrentConditions:
     observed_at: datetime
     temperature_c: float
+    apparent_temperature_c: float
+    relative_humidity_percent: float
+    precipitation_mm: float
+    weather_code: int
     description: str
+    cloud_cover_percent: float
     wind_speed_mph: float
+    wind_direction_degrees: float
+    wind_gusts_mph: float
+    is_day: bool
