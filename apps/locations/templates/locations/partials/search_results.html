@@ -1,9 +1,38 @@
-{% if form.errors %}
-  <p class="rounded-xl bg-red-950/50 p-4 text-red-200">
-    Enter a UK town, city, or postcode.
-  </p>
-{% elif query %}
-  <div class="weather-card">
-    <p>Weather results for <strong>{{ query }}</strong> will appear here.</p>
+{% if form.query.errors %}
+  <div class="mt-3 border-t border-white/10 pt-3" role="alert">
+    {% for error in form.query.errors %}
+      <p class="text-sm text-red-200">{{ error }}</p>
+    {% endfor %}
   </div>
+{% elif regions %}
+  <div class="mt-3 border-t border-white/10 pt-3">
+    <p class="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+      Matching regions
+    </p>
+    <ul class="space-y-1" aria-label="Region search results">
+      {% for region in regions %}
+        <li>
+          <button
+            type="button"
+            class="w-full rounded-lg px-3 py-2 text-left transition hover:bg-white/10 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-weather-sky"
+            data-region-search-result
+            data-region-code="{{ region.code }}"
+            data-region-name="{{ region.name }}"
+            data-region-bounds="{{ region.search_envelope.extent|join:',' }}"
+          >
+            <span class="block font-semibold text-slate-50">
+              {{ region.name }}
+            </span>
+            <span class="mt-0.5 block text-xs text-slate-400">
+              {{ region.get_region_type_display }}
+            </span>
+          </button>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elif query %}
+  <p class="mt-3 border-t border-white/10 px-2 pt-3 text-sm text-slate-300" role="status">
+    No regions found for <strong>{{ query }}</strong>.
+  </p>
 {% endif %}

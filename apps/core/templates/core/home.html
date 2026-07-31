@@ -11,6 +11,53 @@
       data-map-worker-url="{% static 'js/maplibre-gl-worker.mjs' %}"
     ></div>
 
+    <section
+      class="absolute inset-x-4 top-4 z-20 rounded-2xl border border-white/15 bg-weather-navy/95 p-4 shadow-2xl backdrop-blur md:right-auto md:w-96"
+      aria-labelledby="region-search-heading"
+    >
+      <h1 id="region-search-heading" class="text-lg font-bold">
+        Find a region
+      </h1>
+      <p class="mt-1 text-xs text-slate-400">
+        Search counties and local authorities by name.
+      </p>
+
+      <form class="mt-3" role="search" onsubmit="return false">
+        <label class="sr-only" for="region-search-input">
+          Region or local authority
+        </label>
+        <div class="relative">
+          <input
+            id="region-search-input"
+            name="query"
+            type="search"
+            class="w-full rounded-xl border border-white/15 bg-slate-950/60 py-3 pl-4 pr-12 text-sm text-slate-50 outline-none placeholder:text-slate-500 focus:border-weather-sky focus:ring-2 focus:ring-weather-sky/30"
+            placeholder="e.g. Edinburgh or Bristol"
+            autocomplete="off"
+            spellcheck="false"
+            aria-controls="region-search-results"
+            hx-get="{% url 'locations:region_search' %}"
+            hx-trigger="input changed delay:300ms, search"
+            hx-target="#region-search-results"
+            hx-swap="innerHTML"
+            hx-indicator="#region-search-spinner"
+          >
+          <span
+            id="region-search-spinner"
+            class="htmx-indicator absolute right-4 top-1/2 size-5 -translate-y-1/2 animate-spin rounded-full border-2 border-weather-sky/30 border-t-weather-sky"
+            aria-label="Searching"
+            role="status"
+          ></span>
+        </div>
+      </form>
+
+      <div
+        id="region-search-results"
+        aria-live="polite"
+        aria-atomic="true"
+      ></div>
+    </section>
+
     <aside
       id="weather-panel"
       class="absolute inset-x-4 bottom-4 z-10 max-h-[70vh] overflow-y-auto md:inset-x-auto md:right-6 md:top-6 md:bottom-auto md:max-h-[calc(100vh-7rem)] md:w-96"
@@ -60,6 +107,15 @@
           Try again
         </button>
       </section>
+    </template>
+
+    <template id="region-search-error">
+      <p
+        class="mt-3 border-t border-red-400/20 pt-3 text-sm text-red-200"
+        role="alert"
+      >
+        We could not search for regions. Check your connection and try again.
+      </p>
     </template>
   </main>
 {% endblock %}
