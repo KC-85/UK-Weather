@@ -6,6 +6,11 @@ app_name = "locations"
 
 urlpatterns = [
     path(
+        "search/",
+        views.region_search,
+        name="region_search",
+    ),
+    path(
         "regions.geojson",
         views.regions_geojson,
         name="regions_geojson",
