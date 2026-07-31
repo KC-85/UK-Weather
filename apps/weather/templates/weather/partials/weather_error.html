@@ -1,3 +1,16 @@
 <div role="alert" class="rounded-xl bg-red-950/50 p-4 text-red-200">
-  We could not load the forecast. Please try again.
+  <p class="font-semibold">We could not load the forecast.</p>
+  <p class="mt-1 text-sm text-red-200/80">
+    The region is still available, so you can try the weather request again.
+  </p>
+  <button
+    type="button"
+    class="mt-4 rounded-lg border border-red-300/30 px-3 py-2 text-sm font-semibold transition hover:bg-red-300/10 focus:outline-none focus:ring-2 focus:ring-red-300"
+    hx-get="{% url 'weather:current_conditions' region.code %}"
+    hx-target="#current-weather"
+    hx-swap="innerHTML"
+    hx-disabled-elt="this"
+  >
+    Try again
+  </button>
 </div>

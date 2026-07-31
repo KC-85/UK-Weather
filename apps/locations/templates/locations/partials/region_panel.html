@@ -20,9 +20,15 @@
     </div>
   </dl>
 
-  <div class="mt-6 border-t border-white/10 pt-5">
-    <p class="text-sm text-slate-300">
-      Weather conditions for this region will appear here.
-    </p>
+  <div
+    id="current-weather"
+    class="mt-6 border-t border-white/10 pt-5"
+    hx-get="{% url 'weather:current_conditions' region.code %}"
+    hx-trigger="load"
+    hx-swap="innerHTML"
+    hx-sync="this:replace"
+    aria-live="polite"
+  >
+    {% include "weather/partials/loading.html" %}
   </div>
 </section>
