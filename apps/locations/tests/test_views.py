@@ -188,3 +188,114 @@ def test_region_panel_returns_not_found_for_unknown_code(client):
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_region_search_finds_regions_case_insensitively(client, region):
+    response = client.get(
+        reverse("locations:region_search"),
+        {"query": "eDiNbUrGh"},
+    )
+
+    assert response.status_code == 200
+    assert "locations/partials/search_results.html" in [
+        template.name for template in response.templates
+    ]
+    assert list(response.context["regions"]) == [region]
+    assert b"City of Edinburgh" in response.content
+    assert b'data-region-code="S12000036"' in response.content
+    assert b"data-region-bounds=" in response.content
+
+
+@pytest.mark.django_db
+def test_region_search_prioritizes_exact_then_prefix_matches(
+    client,
+    region,
+):
+    prefix_match = Region.objects.create(
+        code="S12000999",
+        name="City of Edinburgh North",
+        region_type=Region.Types.LOCAL_AUTHORITY,
+        boundary=region.boundary,
+        forecast_point=Point(-3.18, 56.0, srid=4326),
+    )
+
+    response = client.get(
+        reverse("locations:region_search"),
+        {"query": "City of Edinburgh"},
+    )
+
+    assert list(response.context["regions"]) == [region, prefix_match]
+
+
+@pytest.mark.django_db
+def test_region_search_returns_empty_state(client):
+    response = client.get(
+        reverse("locations:region_search"),
+        {"query": "Not a UK region"},
+    )
+
+    assert response.status_code == 200
+    assert b"No regions found" in response.content
+
+
+@pytest.mark.django_db
+def test_region_search_requires_at_least_two_characters(client, region):
+    response = client.get(
+        reverse("locations:region_search"),
+        {"query": "E"},
+    )
+
+    assert response.status_code == 200
+    assert not response.context["form"].is_valid()
+    assert b"at least 2 characters" in response.content
+    assert b"City of Edinburgh" not in response.content
+
+
+@pytest.mark.django_db
+def test_region_search_limits_results(client, region):
+    for index in range(10):
+        Region.objects.create(
+            code=f"S12001{index:03}",
+            name=f"Test Region {index:02}",
+            region_type=Region.Types.LOCAL_AUTHORITY,
+            boundary=region.boundary,
+            forecast_point=Point(-3.0 + (index / 100), 56.0, srid=4326),
+        )
+
+    response = client.get(
+        reverse("locations:region_search"),
+        {"query": "Test Region"},
+    )
+
+    assert len(response.context["regions"]) == 8
+    assert response.content.count(b"data-region-search-result") == 8
+
+
+def test_region_search_clears_results_for_blank_query(client):
+    response = client.get(
+        reverse("locations:region_search"),
+        {"query": ""},
+    )
+
+    assert response.status_code == 200
+    assert response.content.strip() == b""
+
+
+def test_region_search_rejects_post(client):
+    response = client.post(
+        reverse("locations:region_search"),
+        {"query": "Edinburgh"},
+    )
+
+    assert response.status_code == 405
+
+
+def test_home_includes_region_search_controls(client):
+    response = client.get(reverse("core:home"))
+
+    assert response.status_code == 200
+    assert reverse("locations:region_search").encode() in response.content
+    assert b'id="region-search-input"' in response.content
+    assert b'id="region-search-results"' in response.content
+    assert b'id="region-search-error"' in response.content

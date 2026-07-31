@@ -1,20 +1,66 @@
 import json
 import math
 
-from django.contrib.gis.db.models.functions import AsGeoJSON, GeomOutputGeoFunc
+from django.contrib.gis.db.models.functions import (
+    AsGeoJSON,
+    Envelope,
+    GeomOutputGeoFunc,
+)
 from django.contrib.gis.geos import Polygon
+from django.db.models import Case, IntegerField, Value, When
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.views.decorators.http import require_GET
 
+from .forms import LocationSearchForm
 from .models import Region
 
 DEFAULT_SIMPLIFICATION_TOLERANCE = 0.001
 MAX_SIMPLIFICATION_TOLERANCE = 0.1
+REGION_SEARCH_LIMIT = 8
 
 
 class SimplifyPreserveTopology(GeomOutputGeoFunc):
     function = "ST_SimplifyPreserveTopology"
     arity = 2
+
+
+@require_GET
+def region_search(request):
+    raw_query = request.GET.get("query", "")
+    query = raw_query.strip()
+    regions = Region.objects.none()
+
+    if query:
+        form = LocationSearchForm({"query": raw_query})
+        if form.is_valid():
+            query = form.cleaned_data["query"]
+            regions = (
+                Region.objects.filter(name__icontains=query)
+                .annotate(
+                    search_rank=Case(
+                        When(name__iexact=query, then=Value(0)),
+                        When(name__istartswith=query, then=Value(1)),
+                        default=Value(2),
+                        output_field=IntegerField(),
+                    ),
+                    search_envelope=Envelope("boundary"),
+                )
+                .only("code", "name", "region_type")
+                .order_by("search_rank", "name")[:REGION_SEARCH_LIMIT]
+            )
+    else:
+        form = LocationSearchForm()
+
+    return render(
+        request,
+        "locations/partials/search_results.html",
+        {
+            "form": form,
+            "query": query,
+            "regions": regions,
+        },
+    )
 
 
 def region_panel(request, code):
