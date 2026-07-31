@@ -12,6 +12,7 @@ OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 OPEN_METEO_CACHE_NAME = ".openmeteo-cache"
 OPEN_METEO_CACHE_SECONDS = 60 * 60
 OPEN_METEO_TIMEOUT_SECONDS = 10
+HOURLY_FORECAST_HOURS = 24
 
 CURRENT_VARIABLES = (
     "temperature_2m",
@@ -23,6 +24,15 @@ CURRENT_VARIABLES = (
     "wind_speed_10m",
     "wind_direction_10m",
     "wind_gusts_10m",
+    "is_day",
+)
+
+HOURLY_VARIABLES = (
+    "temperature_2m",
+    "apparent_temperature",
+    "precipitation",
+    "weather_code",
+    "wind_speed_10m",
     "is_day",
 )
 
@@ -64,9 +74,10 @@ class OpenMeteoClient:
             "latitude": latitude,
             "longitude": longitude,
             "current": list(CURRENT_VARIABLES),
+            "hourly": list(HOURLY_VARIABLES),
             "models": "ukmo_seamless",
             "timezone": "Europe/London",
-            "forecast_days": 7,
+            "forecast_hours": HOURLY_FORECAST_HOURS,
             "wind_speed_unit": "mph",
         }
 

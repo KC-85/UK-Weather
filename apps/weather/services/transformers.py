@@ -2,9 +2,16 @@ import math
 from datetime import UTC, datetime
 from typing import Protocol
 
-from apps.weather.types.forecast import CurrentConditions
+from apps.weather.types.forecast import (
+    CurrentConditions,
+    HourlyForecastPeriod,
+)
 
-from .client import CURRENT_VARIABLES
+from .client import (
+    CURRENT_VARIABLES,
+    HOURLY_FORECAST_HOURS,
+    HOURLY_VARIABLES,
+)
 from .exceptions import WeatherServiceError
 
 WMO_WEATHER_DESCRIPTIONS = {
@@ -41,6 +48,9 @@ WMO_WEATHER_DESCRIPTIONS = {
 CURRENT_VARIABLE_INDEX = {
     name: index for index, name in enumerate(CURRENT_VARIABLES)
 }
+HOURLY_VARIABLE_INDEX = {
+    name: index for index, name in enumerate(HOURLY_VARIABLES)
+}
 
 
 class CurrentVariable(Protocol):
@@ -53,8 +63,28 @@ class CurrentWeather(Protocol):
     def Variables(self, index: int) -> CurrentVariable | None: ...
 
 
+class HourlyValues(Protocol):
+    def __len__(self) -> int: ...
+
+    def __getitem__(self, index: int) -> float: ...
+
+
+class HourlyVariable(Protocol):
+    def ValuesAsNumpy(self) -> HourlyValues: ...
+
+
+class HourlyWeather(Protocol):
+    def Time(self) -> int: ...
+
+    def Interval(self) -> int: ...
+
+    def Variables(self, index: int) -> HourlyVariable | None: ...
+
+
 class ForecastResponse(Protocol):
     def Current(self) -> CurrentWeather | None: ...
+
+    def Hourly(self) -> HourlyWeather | None: ...
 
 
 def weather_code_description(code: int) -> str:
@@ -98,6 +128,81 @@ def normalize_current_conditions(
     )
 
 
+def normalize_hourly_forecast(
+    response: ForecastResponse,
+    limit: int = HOURLY_FORECAST_HOURS,
+) -> list[HourlyForecastPeriod]:
+    """Convert Open-Meteo hourly arrays into forecast periods."""
+    hourly = response.Hourly()
+    if hourly is None:
+        raise WeatherServiceError("Open-Meteo returned no hourly forecast.")
+
+    if limit <= 0:
+        raise ValueError("Hourly forecast limit must be positive.")
+
+    interval = hourly.Interval()
+    if interval <= 0:
+        raise WeatherServiceError(
+            "Open-Meteo returned an invalid hourly interval."
+        )
+
+    values_by_name = {
+        name: _hourly_values(hourly, name) for name in HOURLY_VARIABLES
+    }
+    lengths = {len(values) for values in values_by_name.values()}
+
+    if not lengths or lengths == {0}:
+        raise WeatherServiceError("Open-Meteo returned no hourly periods.")
+
+    if len(lengths) != 1:
+        raise WeatherServiceError(
+            "Open-Meteo returned inconsistent hourly data."
+        )
+
+    period_count = min(limit, lengths.pop())
+    forecast = []
+
+    for index in range(period_count):
+        weather_code = int(
+            _hourly_value(values_by_name, "weather_code", index)
+        )
+        forecast.append(
+            HourlyForecastPeriod(
+                forecast_at=datetime.fromtimestamp(
+                    hourly.Time() + (index * interval),
+                    tz=UTC,
+                ),
+                temperature_c=_hourly_value(
+                    values_by_name,
+                    "temperature_2m",
+                    index,
+                ),
+                apparent_temperature_c=_hourly_value(
+                    values_by_name,
+                    "apparent_temperature",
+                    index,
+                ),
+                precipitation_mm=_hourly_value(
+                    values_by_name,
+                    "precipitation",
+                    index,
+                ),
+                weather_code=weather_code,
+                description=weather_code_description(weather_code),
+                wind_speed_mph=_hourly_value(
+                    values_by_name,
+                    "wind_speed_10m",
+                    index,
+                ),
+                is_day=bool(
+                    _hourly_value(values_by_name, "is_day", index)
+                ),
+            )
+        )
+
+    return forecast
+
+
 def _current_value(current: CurrentWeather, variable_name: str) -> float:
     index = CURRENT_VARIABLE_INDEX[variable_name]
     variable = current.Variables(index)
@@ -111,6 +216,37 @@ def _current_value(current: CurrentWeather, variable_name: str) -> float:
     if not math.isfinite(value):
         raise WeatherServiceError(
             f"Open-Meteo returned an invalid value for: {variable_name}."
+        )
+
+    return value
+
+
+def _hourly_values(
+    hourly: HourlyWeather,
+    variable_name: str,
+) -> HourlyValues:
+    index = HOURLY_VARIABLE_INDEX[variable_name]
+    variable = hourly.Variables(index)
+
+    if variable is None:
+        raise WeatherServiceError(
+            f"Open-Meteo omitted hourly variable: {variable_name}."
+        )
+
+    return variable.ValuesAsNumpy()
+
+
+def _hourly_value(
+    values_by_name: dict[str, HourlyValues],
+    variable_name: str,
+    index: int,
+) -> float:
+    value = float(values_by_name[variable_name][index])
+
+    if not math.isfinite(value):
+        raise WeatherServiceError(
+            f"Open-Meteo returned an invalid hourly value for: "
+            f"{variable_name}."
         )
 
     return value
