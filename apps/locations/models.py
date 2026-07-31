@@ -30,6 +30,57 @@ class Region(models.Model):
         return self.name
 
 
+class Settlement(models.Model):
+    class Types(models.TextChoices):
+        CITY = 'city', 'City'
+        TOWN = 'town', 'Town'
+        VILLAGE = 'village', 'Village'
+        HAMLET = 'hamlet', 'Hamlet'
+
+    class Sources(models.TextChoices):
+        OS_OPEN_NAMES = 'os_open_names', 'OS Open Names'
+
+    class Countries(models.TextChoices):
+        ENGLAND = 'England', 'England'
+        SCOTLAND = 'Scotland', 'Scotland'
+        WALES = 'Wales', 'Wales'
+        NORTHERN_IRELAND = 'Northern Ireland', 'Northern Ireland'
+
+    source = models.CharField(max_length=32, choices=Sources.choices)
+    source_id = models.CharField(max_length=100)
+    name = models.CharField(max_length=150)
+    alternate_name = models.CharField(max_length=150, blank=True)
+    settlement_type = models.CharField(max_length=16, choices=Types.choices)
+    country = models.CharField(max_length=32, choices=Countries.choices)
+    location = models.PointField(srid=4326)
+    population = models.PositiveIntegerField(null=True, blank=True)
+    region = models.ForeignKey(
+        Region,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='settlements',
+    )
+
+    class Meta:
+        ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['source', 'source_id'],
+                name='unique_settlement_source_id',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['settlement_type', 'name'],
+                name='settlement_type_name_idx',
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
 class SavedLocation(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
