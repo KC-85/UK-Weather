@@ -2,7 +2,7 @@ import pytest
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.db import IntegrityError, transaction
 
-from apps.locations.models import Region, SavedLocation
+from apps.locations.models import Region, SavedLocation, Settlement
 
 
 @pytest.fixture
@@ -66,6 +66,58 @@ def test_region_parent_child_relationship(region):
 
     assert region.parent == nation
     assert list(nation.children.all()) == [region]
+
+
+@pytest.mark.django_db
+def test_settlement_string_and_region_relationship(region):
+    settlement = Settlement.objects.create(
+        source=Settlement.Sources.OS_OPEN_NAMES,
+        source_id="osgb4000000074565735",
+        name="Edinburgh",
+        settlement_type=Settlement.Types.CITY,
+        country=Settlement.Countries.SCOTLAND,
+        location=Point(-3.1883, 55.9533, srid=4326),
+        region=region,
+    )
+
+    assert str(settlement) == "Edinburgh"
+    assert list(region.settlements.all()) == [settlement]
+
+
+@pytest.mark.django_db
+def test_settlement_source_identifier_is_unique(region):
+    values = {
+        "source": Settlement.Sources.OS_OPEN_NAMES,
+        "source_id": "osgb4000000074565735",
+        "name": "Edinburgh",
+        "settlement_type": Settlement.Types.CITY,
+        "country": Settlement.Countries.SCOTLAND,
+        "location": Point(-3.1883, 55.9533, srid=4326),
+        "region": region,
+    }
+    Settlement.objects.create(**values)
+
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            Settlement.objects.create(**values)
+
+
+@pytest.mark.django_db
+def test_deleting_region_preserves_settlement(region):
+    settlement = Settlement.objects.create(
+        source=Settlement.Sources.OS_OPEN_NAMES,
+        source_id="osgb4000000074565735",
+        name="Edinburgh",
+        settlement_type=Settlement.Types.CITY,
+        country=Settlement.Countries.SCOTLAND,
+        location=Point(-3.1883, 55.9533, srid=4326),
+        region=region,
+    )
+
+    region.delete()
+    settlement.refresh_from_db()
+
+    assert settlement.region is None
 
 
 @pytest.mark.django_db
