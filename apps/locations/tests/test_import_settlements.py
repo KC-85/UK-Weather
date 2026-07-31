@@ -10,6 +10,12 @@ from apps.locations.models import Region, Settlement
 
 
 def write_open_names_database(path, rows):
+    prepared_rows = []
+    for row in rows:
+        geometry_coordinates = row[10:12] if len(row) == 12 else row[7:9]
+        geometry = geopackage_point(*geometry_coordinates)
+        prepared_rows.append((*row[:9], geometry, row[9]))
+
     with sqlite3.connect(path) as connection:
         connection.execute(
             """
@@ -23,16 +29,27 @@ def write_open_names_database(path, rows):
                 local_type TEXT,
                 mbr_xmin REAL,
                 mbr_ymin REAL,
+                geometry BLOB,
                 country TEXT
             )
             """
         )
         connection.executemany(
             """
-            INSERT INTO named_place VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO named_place
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            rows,
+            prepared_rows,
         )
+
+
+def geopackage_point(easting, northing):
+    header = b"GP\x00\x01" + (27700).to_bytes(
+        4,
+        byteorder="little",
+        signed=True,
+    )
+    return header + bytes(Point(easting, northing).wkb)
 
 
 @pytest.fixture
@@ -111,6 +128,36 @@ def test_import_settlements_creates_cities_and_towns(
     assert edinburgh.location.x == pytest.approx(-3.1883, abs=0.001)
     assert edinburgh.location.y == pytest.approx(55.9533, abs=0.001)
     assert "2 created, 0 updated; 0 without an authority" in output.getvalue()
+
+
+@pytest.mark.django_db
+def test_import_settlements_uses_point_geometry_not_mbr(tmp_path):
+    source = tmp_path / "opname.gpkg"
+    write_open_names_database(
+        source,
+        [
+            (
+                "os-london",
+                "London",
+                "eng",
+                None,
+                None,
+                "populatedPlace",
+                "City",
+                504454,
+                156590,
+                "England",
+                530034,
+                180381,
+            )
+        ],
+    )
+
+    call_command("import_settlements", source, stdout=StringIO())
+
+    location = Settlement.objects.get().location
+    assert location.x == pytest.approx(-0.127724, abs=0.000001)
+    assert location.y == pytest.approx(51.507407, abs=0.000001)
 
 
 @pytest.mark.django_db

@@ -1,9 +1,8 @@
-import math
 import sqlite3
 from pathlib import Path
 
 from django.contrib.gis.gdal import GDALException
-from django.contrib.gis.geos import GEOSException, Point
+from django.contrib.gis.geos import GEOSException, GEOSGeometry
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import OuterRef, Subquery
@@ -15,6 +14,15 @@ TARGET_SRID = 4326
 SOURCE_TABLE = "named_place"
 SOURCE_TYPE = "populatedPlace"
 DEFAULT_BATCH_SIZE = 500
+GEOPACKAGE_MAGIC = b"GP"
+GEOPACKAGE_BASE_HEADER_SIZE = 8
+GEOPACKAGE_ENVELOPE_SIZES = {
+    0: 0,
+    1: 32,
+    2: 48,
+    3: 48,
+    4: 64,
+}
 SOURCE_TYPE_MAP = {
     label: value for value, label in Settlement.Types.choices
 }
@@ -26,8 +34,7 @@ REQUIRED_COLUMNS = {
     "name2_lang",
     "type",
     "local_type",
-    "mbr_xmin",
-    "mbr_ymin",
+    "geometry",
     "country",
 }
 
@@ -138,7 +145,7 @@ class Command(BaseCommand):
                 placeholders = ", ".join("?" for _ in requested_types)
                 query = (
                     "SELECT id, name1, name1_lang, name2, name2_lang, "
-                    "local_type, mbr_xmin, mbr_ymin, country "
+                    "local_type, geometry, country "
                     f"FROM {SOURCE_TABLE} "
                     "WHERE type = ? "
                     f"AND local_type IN ({placeholders}) "
@@ -246,18 +253,70 @@ class Command(BaseCommand):
 
     def _location(self, row, row_number):
         try:
-            easting = float(row["mbr_xmin"])
-            northing = float(row["mbr_ymin"])
-            if not math.isfinite(easting) or not math.isfinite(northing):
-                raise ValueError("coordinates are not finite")
+            geometry_blob = bytes(row["geometry"])
+            wkb_offset, source_srid = self._geometry_header(
+                geometry_blob,
+                row_number,
+            )
+            location = GEOSGeometry(memoryview(geometry_blob[wkb_offset:]))
+            location.srid = source_srid
 
-            location = Point(easting, northing, srid=SOURCE_SRID)
+            if location.geom_type != "Point":
+                raise ValueError(
+                    f"geometry type is {location.geom_type}; expected Point"
+                )
+            if location.empty:
+                raise ValueError("geometry is empty")
+
             location.transform(TARGET_SRID)
             return location
-        except (GDALException, GEOSException, TypeError, ValueError) as error:
+        except (
+            GDALException,
+            GEOSException,
+            KeyError,
+            TypeError,
+            ValueError,
+        ) as error:
             raise CommandError(
                 f"Could not transform feature {row_number}: {error}"
             ) from error
+
+    def _geometry_header(self, geometry_blob, row_number):
+        if (
+            len(geometry_blob) < GEOPACKAGE_BASE_HEADER_SIZE
+            or geometry_blob[:2] != GEOPACKAGE_MAGIC
+        ):
+            raise ValueError(
+                f"feature {row_number} has an invalid GeoPackage geometry"
+            )
+
+        flags = geometry_blob[3]
+        envelope_type = (flags >> 1) & 0b111
+        envelope_size = GEOPACKAGE_ENVELOPE_SIZES.get(envelope_type)
+        if envelope_size is None:
+            raise ValueError(
+                f"feature {row_number} uses an unsupported geometry envelope"
+            )
+
+        byte_order = "little" if flags & 0b1 else "big"
+        source_srid = int.from_bytes(
+            geometry_blob[4:8],
+            byteorder=byte_order,
+            signed=True,
+        )
+        if source_srid != SOURCE_SRID:
+            raise ValueError(
+                f"feature {row_number} uses SRID {source_srid}; "
+                f"expected {SOURCE_SRID}"
+            )
+
+        wkb_offset = GEOPACKAGE_BASE_HEADER_SIZE + envelope_size
+        if len(geometry_blob) <= wkb_offset:
+            raise ValueError(
+                f"feature {row_number} has no geometry payload"
+            )
+
+        return wkb_offset, source_srid
 
     def _assign_regions(self):
         containing_authority = (
