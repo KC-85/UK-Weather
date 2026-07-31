@@ -166,6 +166,22 @@ def test_region_panel_includes_forecast_coordinates(client, region):
 
 
 @pytest.mark.django_db
+def test_region_panel_loads_current_weather_with_htmx(client, region):
+    response = client.get(
+        reverse("locations:region_panel", args=[region.code])
+    )
+
+    weather_url = reverse(
+        "weather:current_conditions",
+        args=[region.code],
+    )
+    assert weather_url.encode() in response.content
+    assert b'hx-trigger="load"' in response.content
+    assert b'id="current-weather"' in response.content
+    assert b"Updating forecast" in response.content
+
+
+@pytest.mark.django_db
 def test_region_panel_returns_not_found_for_unknown_code(client):
     response = client.get(
         reverse("locations:region_panel", args=["UNKNOWN"])
