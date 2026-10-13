@@ -10,6 +10,7 @@
       data-settlements-url="{% url 'locations:settlements_geojson' %}"
       data-region-panel-url-template="{% url 'locations:region_panel' 'REGION_CODE' %}"
       data-map-worker-url="{% static 'js/maplibre-gl-worker.mjs' %}"
+      data-map-style-url="{{ map_style_url }}"
     ></div>
 
     <section

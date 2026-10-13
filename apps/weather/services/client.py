@@ -1,3 +1,4 @@
+import os
 from typing import Protocol
 
 import openmeteo_requests
@@ -9,7 +10,7 @@ from .exceptions import WeatherServiceError
 from .provider import WeatherProvider
 
 OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
-OPEN_METEO_CACHE_NAME = ".openmeteo-cache"
+OPEN_METEO_CACHE_NAME = os.getenv("OPEN_METEO_CACHE_NAME", ".openmeteo-cache")
 OPEN_METEO_CACHE_SECONDS = 60 * 60
 OPEN_METEO_TIMEOUT_SECONDS = 10
 HOURLY_FORECAST_HOURS = 24
@@ -108,9 +109,7 @@ class OpenMeteoClient:
             ) from error
 
         if not responses:
-            raise WeatherServiceError(
-                "Open-Meteo returned no forecast response."
-            )
+            raise WeatherServiceError("Open-Meteo returned no forecast response.")
 
         return responses[0]
 

@@ -1,0 +1,16 @@
+.git
+.env
+.env.*
+.aws
+.agents
+.codex
+.venv
+venv
+node_modules
+__pycache__
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.openmeteo-cache*
+staticfiles
+*.docx

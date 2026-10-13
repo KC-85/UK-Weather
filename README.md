@@ -11,9 +11,8 @@ current conditions plus hourly and seven-day forecasts. Settlements provide
 geographical context, while forecasts remain attached to local authorities.
 
 > [!IMPORTANT]
-> This project is currently configured for local development. The Django
-> settings contain development-only values and must be hardened before any
-> public deployment. See [Production considerations](#production-considerations).
+> Render deployment configuration is provided. Follow [DEPLOYMENT.md](DEPLOYMENT.md)
+> to configure production variables, a licensed map provider, and geographic data.
 
 ## Contents
 
@@ -310,7 +309,7 @@ Use `npm install` instead when intentionally updating dependencies.
 
 ### 5. Create `.env`
 
-There is currently no `.env.example`; create `.env` in the repository root:
+An `.env.example` is provided; copy it to `.env` in the repository root, or create:
 
 ```dotenv
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE_NAME
@@ -381,11 +380,9 @@ PostGIS is used for:
 
 ### Note about `compose.yml`
 
-The current `compose.yml` uses `postgres:17-alpine`, which is standard
-PostgreSQL and does **not** bundle PostGIS. It is therefore not sufficient for
-the current GeoDjango schema as written. Use the existing hosted PostGIS
-database, install PostGIS locally, or change the service to an appropriate
-PostGIS-enabled image before initializing a fresh local development database.
+The current `compose.yml` uses `postgis/postgis:17-3.5`, which bundles PostGIS.
+New databases initialise with PostGIS enabled. For existing volumes, enable
+the extension explicitly if needed; do not delete the volume to accomplish this.
 
 Do not point migrations or import commands at a database whose data you are not
 prepared to modify.
@@ -884,7 +881,7 @@ not relicensed by this repository's GPL licence.
 - The `/weather/<location>/` route is an early placeholder; the interactive
   authority panel is the main forecast UI.
 - The public MapLibre demonstration style should be replaced before deployment.
-- The current settings are a single development settings module.
+- Settings support local development and environment-driven production configuration.
 - Background refresh jobs, persistent forecast storage, observability, and
   application-level rate limiting are not yet implemented.
 
@@ -893,42 +890,22 @@ Likely next steps:
 1. Add settlement-aware autocomplete while preserving authority-based weather.
 2. Add clustering or collision rules for dense city/town areas.
 3. Implement saved-location actions and authentication UI.
-4. Add a dedicated production settings module and static-file strategy.
+4. Validate the Render deployment with your imported geographic data.
 5. Replace the demonstration basemap with a properly licensed production style
    and tile provider.
-6. Add deployment, monitoring, and continuous-integration configuration.
+6. Add monitoring and continuous-integration configuration.
 
 ## Production considerations
 
-The present `config/settings.py` is development-only:
+Render deployment files and instructions are in [DEPLOYMENT.md](DEPLOYMENT.md).
+Production mode requires `DJANGO_SECRET_KEY` and `MAP_STYLE_URL`, disables debug,
+configures HTTPS and secure cookies, and serves static files through WhiteNoise.
+The Dockerfile includes the GIS libraries and builds frontend assets.
 
-- `DEBUG` is `True`.
-- `SECRET_KEY` is a placeholder string.
-- `ALLOWED_HOSTS` is empty.
-- There is no separate production settings module.
-- Production static-file serving has not been configured.
-- Security headers, trusted origins, proxy/TLS settings, logging, and error
-  monitoring need explicit production configuration.
-
-Before deployment:
-
-1. Load a strong secret key and all credentials from environment variables.
-2. Disable debug mode.
-3. Configure hosts, CSRF trusted origins, HTTPS, secure cookies, and proxy
-   headers for the deployment platform.
-4. Configure `STATIC_ROOT`, `collectstatic`, and an appropriate static-file or
-   CDN strategy.
-5. Use a managed PostGIS database with backups and least-privilege credentials.
-6. Replace the demonstration basemap and document every data-provider licence.
-7. Add timeouts, logging, monitoring, and rate controls appropriate to expected
-   traffic.
-8. Run tests, Django deployment checks, and the frontend build in CI.
-
-Useful final check once production settings exist:
-
-```bash
-python3 manage.py check --deploy
-```
+Before public launch, import the geographic datasets, configure your map
+provider's licensing and token restrictions, review database backups and access,
+and run the full test suite and `python manage.py check --deploy` in the target
+environment. Monitoring and application-level rate limiting remain future work.
 
 ## Command reference
 

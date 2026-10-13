@@ -61,7 +61,7 @@ export const initialiseWeatherMap = (): void => {
 
   const map = new MapLibreMap({
     container,
-    style: "https://demotiles.maplibre.org/style.json",
+    style: container.dataset.mapStyleUrl || "https://demotiles.maplibre.org/style.json",
     center: [-3.5, 54.8],
     zoom: 5,
     minZoom: 4,

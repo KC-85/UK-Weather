@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: uk-weather
+    runtime: docker
+    plan: 0.5c-512mb
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    preDeployCommand: python manage.py migrate --noinput
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: uk-weather-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: MAP_STYLE_URL
+        sync: false
+databases:
+  - name: uk-weather-db
+    databaseName: uk_weather
+    user: weather
+    postgresMajorVersion: "17"
+    plan: 0.1c-256mb
+    diskSizeGB: 5
+    region: frankfurt
+    ipAllowList: []
